@@ -16,6 +16,8 @@ libraryDependencies ++= Seq(
   "com.typesafe.slick"  %% "slick"                % "3.2.0",
   "com.google.inject"   % "guice"                 % "4.1.0",
   "com.tzavellas"       %  "sse-guice"            % "0.7.1" exclude("com.google.inject", "guice"),
+  "org.flywaydb"        % "flyway-core"           % "4.1.2",
+  "org.postgresql"      % "postgresql"            % "42.0.0",
   "org.specs2"          %% "specs2-core"          % specs2Version % Test,
   "org.specs2"          %% "specs2-mock"          % specs2Version % Test
 )
