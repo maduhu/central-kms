@@ -1,5 +1,7 @@
 package org.leveloneproject.central.kms.domain.keys
 
+import java.util.UUID
+
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 
@@ -14,4 +16,6 @@ object KeyDomain extends SprayJsonSupport with DefaultJsonProtocol {
     id: String,
     privateKey: String
   )
+
+  case class Key(id: UUID, publicKey: String)
 }

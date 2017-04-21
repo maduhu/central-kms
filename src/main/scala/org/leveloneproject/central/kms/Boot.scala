@@ -8,10 +8,11 @@ import org.leveloneproject.central.kms.persistance.DatabaseMigrator
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object Boot extends App {
+object Boot extends App with DatabaseMigrator {
   val config = ConfigFactory.load("local")
 
-  new DatabaseMigrator(config).migrate()
+  migrate(config)
+
   val injector = Guice.createInjector(new MainModule(config))
 
   val service = injector.getInstance(classOf[Service])
