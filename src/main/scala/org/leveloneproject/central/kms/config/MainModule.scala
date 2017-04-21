@@ -8,8 +8,8 @@ import com.typesafe.config.Config
 import com.tzavellas.sse.guice.ScalaModule
 import net.i2p.crypto.eddsa.KeyPairGenerator
 import org.leveloneproject.central.kms.{MainRouter, Service}
-import org.leveloneproject.central.kms.domain.keys.{KeyGenerator, KeyRouter}
-import org.leveloneproject.central.kms.persistance.{KeyStore, PostgresKeyStore}
+import org.leveloneproject.central.kms.domain.keys.{KeyGenerator, KeyRouter, KeyStore}
+import org.leveloneproject.central.kms.persistance.postgres.PostgresKeyStore
 import slick.jdbc.PostgresProfile.api._
 
 class MainModule(config: Config) extends ScalaModule {

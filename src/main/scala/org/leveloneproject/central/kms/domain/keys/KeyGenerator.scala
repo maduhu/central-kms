@@ -4,6 +4,7 @@ import java.security.KeyPairGeneratorSpi
 import java.util.UUID
 
 import com.google.inject.Inject
+import org.leveloneproject.central.kms.domain.keys.KeyDomain._
 import org.leveloneproject.central.kms.util.Bytes
 
 import scala.concurrent.ExecutionContext.Implicits.global
