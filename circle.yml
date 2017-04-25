@@ -1,0 +1,16 @@
+general:
+  branches:
+    ignore:
+      - master
+
+dependencies:
+  cache_directories:
+    - "~/.ivy2"
+    - "~/.sbt"
+
+test:
+  override:
+    - sbt test
+  post:
+    - mkdir -p $CIRCLE_TEST_REPORTS/junit/
+    - cp ./target/test-reports/* $CIRCLE_TEST_REPORTS/junit/
