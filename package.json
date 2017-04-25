@@ -1,0 +1,28 @@
+{
+  "name": "central-kms",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Central Key Management Store",
+  "scripts": {
+    "test": "sbt test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LevelOneProject/central-kms.git"
+  },
+  "keywords": [
+    "key",
+    "management",
+    "store"
+  ],
+  "author": "Dwolla",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/LevelOneProject/central-kms/issues"
+  },
+  "homepage": "https://github.com/LevelOneProject/central-kms#readme",
+  "devDependencies": {
+    "aws-sdk": "2.45.0",
+    "bluebird": "3.5.0"
+  }
+}

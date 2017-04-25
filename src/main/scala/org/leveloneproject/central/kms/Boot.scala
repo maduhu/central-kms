@@ -9,7 +9,7 @@ import org.leveloneproject.central.kms.persistance.DatabaseMigrator
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object Boot extends App with DatabaseMigrator {
-  val config = ConfigFactory.load("local")
+  val config = ConfigFactory.load("common")
 
   migrate(config)
 

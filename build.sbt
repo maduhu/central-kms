@@ -1,7 +1,5 @@
 name := "central-kms"
 
-version := "1.0"
-
 scalaVersion := "2.12.1"
 
 val specs2Version = "3.8.6"
@@ -25,4 +23,13 @@ libraryDependencies ++= Seq(
   "org.specs2"          %% "specs2-core"          % specs2Version % Test,
   "org.specs2"          %% "specs2-mock"          % specs2Version % Test
 )
-    
+
+enablePlugins(JavaServerAppPackaging)
+enablePlugins(DockerPlugin)
+enablePlugins(AshScriptPlugin)
+enablePlugins(GitVersioning)
+
+packageName in Docker := "leveloneproject/central-kms"
+dockerBaseImage := "openjdk:8-jdk-alpine"
+dockerExposedPorts := Seq(8080)
+dockerUpdateLatest := true
