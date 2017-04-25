@@ -10,6 +10,10 @@ machine:
     - docker
   node:
     version: 6.5.0
+  environment:
+    AWS_ACCOUNT_ID: 886403637725
+    APP_NAME: central-kms
+    AWS_REGION: us-west-2
 
 dependencies:
   cache_directories:

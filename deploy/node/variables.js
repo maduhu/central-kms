@@ -18,7 +18,7 @@ module.exports = {
   DOCKER_EMAIL: process.env.DOCKER_EMAIL,
   DOCKER_USER: process.env.DOCKER_USER,
   DOCKER_PASS: process.env.DOCKER_PASS,
-  HOSTNAME: process.env.HOSTNAME || 'http://central-kms-000000000.us-west-2.elb.amazonaws.com',
+  HOSTNAME: process.env.HOSTNAME || 'http://central-kms-1467447352.us-west-2.elb.amazonaws.com',
   JFROG_REPO: process.env.JFROG_REPO || 'modusbox-level1-docker-release.jfrog.io',
   POSTGRES_USER: process.env.DEV_POSTGRES_USER,
   POSTGRES_PASSWORD: process.env.DEV_POSTGRES_PASSWORD,
