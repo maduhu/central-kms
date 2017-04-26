@@ -12,8 +12,6 @@ machine:
     version: 6.5.0
 
 dependencies:
-  pre: 
-    - curl -udwolla:$NPM_TOKEN "https://modusbox.jfrog.io/modusbox/api/npm/level1-npm-release/auth/leveloneproject" >> .npmrc
   cache_directories:
     - "~/.ivy2"
     - "~/.sbt"
