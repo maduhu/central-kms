@@ -24,6 +24,8 @@ libraryDependencies ++= Seq(
   "org.specs2"          %% "specs2-mock"          % specs2Version % Test
 )
 
+scalacOptions ++= Seq("-feature")
+
 enablePlugins(JavaServerAppPackaging)
 enablePlugins(DockerPlugin)
 enablePlugins(AshScriptPlugin)
