@@ -1,13 +1,12 @@
 package org.leveloneproject.central.kms.persistance
 
+import com.google.inject.Inject
 import com.typesafe.config.Config
 import org.flywaydb.core.Flyway
 
-trait DatabaseMigrator {
+class Migrator @Inject()(config: Config, flyway: Flyway) {
 
-  val flyway = new Flyway()
-
-  def migrate(config: Config): Unit = {
+  def migrate(): Unit = {
     flyway.setDataSource(config.getString("db.url"), config.getString("db.user"), config.getString("db.password"))
 
     try {

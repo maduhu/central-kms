@@ -14,6 +14,7 @@ machine:
     AWS_ACCOUNT_ID: 886403637725
     APP_NAME: central-kms
     AWS_REGION: us-west-2
+    BUCKET: elasticbeanstalk-$AWS_REGION-$AWS_ACCOUNT_ID
 
 dependencies:
   cache_directories:
@@ -22,10 +23,12 @@ dependencies:
 
 test:
   override:
-    - sbt test
+    - sbt coverage test coverageReport
   post:
     - mkdir -p $CIRCLE_TEST_REPORTS/junit/
-    - cp ./target/test-reports/* $CIRCLE_TEST_REPORTS/junit/
+    - mv target/test-reports/* $CIRCLE_TEST_REPORTS/junit/
+    - mv target/scala-2.12/scoverage-report $CIRCLE_ARTIFACTS/scoverage-report
+    - mv target/scala-2.12/coverage-report $CIRCLE_ARTIFACTS/coverage-report
 
 deployment:
   dev:
@@ -33,3 +36,4 @@ deployment:
     commands:
       - sbt docker:publishLocal
       - node deploy/node/index.js
+      - aws s3 cp $CIRCLE_ARTIFACTS/scoverage-report/scoverage.xml s3://$BUCKET/sonar/$APP_NAME/scoverage.xml
