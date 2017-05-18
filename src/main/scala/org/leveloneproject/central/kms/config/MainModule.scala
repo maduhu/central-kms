@@ -14,6 +14,7 @@ import org.leveloneproject.central.kms.domain.keys.{KeyGenerator, KeyRouter, Key
 import org.leveloneproject.central.kms.persistance.Migrator
 import org.leveloneproject.central.kms.persistance.postgres.PostgresKeyStore
 import org.leveloneproject.central.kms.routing.{RouteAggregator, Router}
+import org.leveloneproject.central.kms.socket.SocketRouter
 import slick.jdbc.PostgresProfile.api._
 
 class MainModule(config: Config) extends ScalaModule with DatabaseCreator {
@@ -41,6 +42,7 @@ class MainModule(config: Config) extends ScalaModule with DatabaseCreator {
     val routerBinder = ScalaMultibinder.newSetBinder[Router](binder)
     routerBinder.addBinding.to[KeyRouter]
     routerBinder.addBinding.to[ValidateRouter]
+    routerBinder.addBinding.to[SocketRouter]
   }
 
 }
