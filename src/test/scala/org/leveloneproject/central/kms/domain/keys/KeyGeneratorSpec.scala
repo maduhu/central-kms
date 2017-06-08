@@ -5,42 +5,41 @@ import java.util.UUID
 
 import net.i2p.crypto.eddsa.KeyPairGenerator
 import org.leveloneproject.central.kms.AwaitResult
+import org.leveloneproject.central.kms.domain.keys.KeyDomain.PublicPrivateKeyPair
 import org.leveloneproject.central.kms.util.Bytes
-import org.specs2.mock.Mockito
-import org.specs2.mutable.Specification
-import org.specs2.specification.Scope
+import org.scalatest.FlatSpec
+import org.scalatest.mockito.MockitoSugar
+import org.mockito.Mockito._
 
-class KeyGeneratorSpec extends Specification with Mockito with AwaitResult {
+class KeyGeneratorSpec extends FlatSpec with MockitoSugar with AwaitResult {
   private val privateKeyString = "00112233445566778899"
   private val publicKeyString = "AABBCCDDEEFF"
 
-  trait Setup extends Scope {
+  trait Setup {
     val keyPairGenerator: KeyPairGeneratorSpi = mock[KeyPairGeneratorSpi]
     val keyGenerator = new KeyGenerator(keyPairGenerator)
   }
 
-  "KeyGenerator" should {
-    "generate pair" in new Setup {
-      private val privateKey = mock[PrivateKey]
-      privateKey.getEncoded returns Bytes.fromHex(privateKeyString)
-      private val publicKey = mock[PublicKey]
-      publicKey.getEncoded returns Bytes.fromHex(publicKeyString)
-      val keyPair = new KeyPair(publicKey, privateKey)
-      keyPairGenerator.generateKeyPair returns keyPair
+  "generate" should "generate pair" in new Setup {
+    private val privateKey = mock[PrivateKey]
+    when(privateKey.getEncoded).thenReturn(Bytes.fromHex(privateKeyString))
+    private val publicKey = mock[PublicKey]
+    when(publicKey.getEncoded).thenReturn(Bytes.fromHex(publicKeyString))
+    val keyPair = new KeyPair(publicKey, privateKey)
+    when(keyPairGenerator.generateKeyPair).thenReturn(keyPair)
 
-      private val result = await(keyGenerator.generate())
-      result.id must_== UUID.fromString(result.id.toString)
-      result.privateKey must_== privateKeyString
-      result.publicKey must_== publicKeyString
-    }
+    private val result = await(keyGenerator.generate())
+    assert(result.privateKey == privateKeyString)
+    assert(result.publicKey == publicKeyString)
+  }
 
-    "generate different keys on successive calls" in {
-      val keyGen = new KeyGenerator(new KeyPairGenerator)
+  it should "generate different keys on successive calls" in new Setup {
+    val keyGen = new KeyGenerator(new KeyPairGenerator)
 
-      val result1 = await(keyGen.generate())
-      val result2 = await(keyGen.generate())
-      result1.privateKey must_!= result2.privateKey
-      result1.publicKey must_!= result2.publicKey
-    }
+    val result1: PublicPrivateKeyPair = await(keyGen.generate())
+    val result2: PublicPrivateKeyPair = await(keyGen.generate())
+    assert(result1.privateKey != result2.privateKey)
+    assert(result1.publicKey != result2.publicKey)
+
   }
 }

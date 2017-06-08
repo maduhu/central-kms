@@ -1,15 +1,15 @@
 package org.leveloneproject.central.kms.config
 
-import com.google.inject.Guice
+
+import com.google.inject.{Guice, Injector}
 import com.typesafe.config.{Config, ConfigFactory}
-import org.specs2.mock.Mockito
-import org.specs2.mutable.Specification
-import org.specs2.specification.Scope
+import org.scalatest.FlatSpec
+import org.scalatest.mockito.MockitoSugar
 import slick.jdbc.PostgresProfile.backend.Database
 
-class MainModuleSpec extends Specification with Mockito {
+class MainModuleSpec extends FlatSpec with MockitoSugar {
 
-  trait Setup extends Scope {
+  trait Setup {
     val config: Config = ConfigFactory.load()
     val database: Database = mock[Database]
 
@@ -18,13 +18,10 @@ class MainModuleSpec extends Specification with Mockito {
     }
 
     val module = new MainModule(config) with FakeDatabaseCreator
-    val injector = Guice.createInjector(module)
+    val injector: Injector = Guice.createInjector(module)
   }
 
-  "configure" should {
-
-    "bind Config to config" in new Setup {
-      injector.getInstance(classOf[Config]) must_== config
-    }
+  it should "bind Config to config" in new Setup {
+    assert(injector.getInstance(classOf[Config]) == config)
   }
 }

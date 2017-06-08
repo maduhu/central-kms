@@ -10,9 +10,9 @@ import net.codingwell.scalaguice.ScalaMultibinder
 import net.i2p.crypto.eddsa.KeyPairGenerator
 import org.flywaydb.core.Flyway
 import org.leveloneproject.central.kms.Service
-import org.leveloneproject.central.kms.domain.keys.{KeyGenerator, KeyRouter, KeyStore, ValidateRouter}
+import org.leveloneproject.central.kms.domain.keys.{KeyGenerator, KeyStore}
 import org.leveloneproject.central.kms.persistance.Migrator
-import org.leveloneproject.central.kms.persistance.postgres.PostgresKeyStore
+import org.leveloneproject.central.kms.persistance.postgres.{KeysRepo, PostgresKeyStore}
 import org.leveloneproject.central.kms.routing.{RouteAggregator, Router}
 import org.leveloneproject.central.kms.socket.SocketRouter
 import slick.jdbc.PostgresProfile.api._
@@ -28,6 +28,7 @@ class MainModule(config: Config) extends ScalaModule with DatabaseCreator {
     bind[ActorMaterializer].toInstance(materializer)
     bind[KeyPairGeneratorSpi].to[KeyPairGenerator]
     bind[Database].toInstance(createDatabase(config))
+    bind[KeysRepo]
     bind[KeyStore].to[PostgresKeyStore]
     bind[Flyway]
     bind[Migrator]
@@ -40,8 +41,6 @@ class MainModule(config: Config) extends ScalaModule with DatabaseCreator {
 
   def bindRouters() = {
     val routerBinder = ScalaMultibinder.newSetBinder[Router](binder)
-    routerBinder.addBinding.to[KeyRouter]
-    routerBinder.addBinding.to[ValidateRouter]
     routerBinder.addBinding.to[SocketRouter]
   }
 

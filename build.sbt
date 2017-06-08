@@ -2,16 +2,17 @@ name := "central-kms"
 
 scalaVersion := "2.12.1"
 
-val specs2Version = "3.8.6"
 val akkaVersion = "2.4.17"
 val akkaHttpVersion = "10.0.5"
 
 val slickVersion = "3.2.0"
+val json4sVersion = "3.5.2"
 libraryDependencies ++= Seq(
   "net.i2p.crypto"      % "eddsa"                 % "0.2.0",
   "com.typesafe.akka"   %% "akka-actor"           % akkaVersion,
   "com.typesafe.akka"   %% "akka-http"            % akkaHttpVersion,
-  "com.typesafe.akka"   %% "akka-http-spray-json" % akkaHttpVersion,
+  "org.json4s"          %% "json4s-native"        % json4sVersion,
+  "org.json4s"          %% "json4s-ext"           % json4sVersion,
   "com.typesafe.slick"  %% "slick"                % slickVersion,
   "com.typesafe.slick"  %% "slick-hikaricp"       % slickVersion exclude("com.zaxxer.HikariCP", "HikariCP"),
   "org.slf4j"           % "slf4j-nop"             % "1.6.4",
@@ -21,12 +22,15 @@ libraryDependencies ++= Seq(
   "org.flywaydb"        % "flyway-core"           % "4.1.2",
   "org.postgresql"      % "postgresql"            % "42.0.0",
   "com.zaxxer"          % "HikariCP"              % "2.6.1",
-  "org.specs2"          %% "specs2-core"          % specs2Version % Test,
-  "org.specs2"          %% "specs2-mock"          % specs2Version % Test
+  "org.scalatest"       %% "scalatest"            % "3.0.3" % Test,
+  "com.typesafe.akka"   %% "akka-http-testkit"    % akkaHttpVersion % Test,
+  "org.mockito"         % "mockito-core"          % "2.8.9" % Test
 )
     
 scalacOptions ++= Seq("-feature", "-deprecation", "-unchecked")
 
+logBuffered in Test := false
+parallelExecution in Test := false
 enablePlugins(JavaServerAppPackaging)
 enablePlugins(DockerPlugin)
 enablePlugins(AshScriptPlugin)

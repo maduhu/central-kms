@@ -1,22 +1,28 @@
 package org.leveloneproject.central.kms.persistance.postgres
 
+import java.sql.SQLException
 import java.util.UUID
 
 import com.google.inject.Inject
-import org.leveloneproject.central.kms.domain.keys.KeyDomain.Key
-import org.leveloneproject.central.kms.domain.keys.KeyStore
+import org.leveloneproject.central.kms.domain.keys._
+import org.leveloneproject.central.kms.persistance.DatabaseHelper
 import org.leveloneproject.central.kms.persistance.dao.KeysTable
-import slick.jdbc.PostgresProfile.api._
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
-class PostgresKeyStore @Inject()(database: Database) extends KeyStore with KeysTable {
-  def create(key: Key): Future[Key] = {
-    database.run(keys += key).map(_ ⇒ key)
+class PostgresKeyStore @Inject()(repo: KeysRepo) extends KeyStore with KeysTable with DatabaseHelper {
+  def create(key: Key): Future[Either[CreateError, Key]] = {
+    repo.insert(key).map { _ ⇒ Right(key) }
+        .recover {
+          case ex: SQLException if isPrimaryKeyViolation(ex) ⇒ Left(CreateError.KeyExists(key.id))
+          case _: SQLException ⇒ Left(CreateError.DatabaseFailed())
+          case _: Throwable ⇒ Left(CreateError.CreateFailed())
+        }
   }
 
   def getById(id: UUID): Future[Option[Key]] = {
-    database.run(keys.filter(_.id === id).result.headOption)
+    repo.getById(id)
   }
 }
+

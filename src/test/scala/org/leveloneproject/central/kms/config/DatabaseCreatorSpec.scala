@@ -1,14 +1,14 @@
 package org.leveloneproject.central.kms.config
 
 import com.typesafe.config.Config
-import org.specs2.mock.Mockito
-import org.specs2.mutable.Specification
-import org.specs2.specification.Scope
+import org.scalatest.FlatSpec
+import org.scalatest.mockito.MockitoSugar
+import org.mockito.Mockito._
 import slick.jdbc.PostgresProfile.backend.{Database, DatabaseFactoryDef}
 
-class DatabaseCreatorSpec extends Specification with Mockito {
+class DatabaseCreatorSpec extends FlatSpec with MockitoSugar {
 
-  trait Setup extends Scope {
+  trait Setup {
     val dbFactory: DatabaseFactoryDef = mock[DatabaseFactoryDef]
     val config: Config = mock[Config]
     val database: Database = mock[Database]
@@ -20,11 +20,9 @@ class DatabaseCreatorSpec extends Specification with Mockito {
     val creator = new TestDatabaseCreator
   }
 
-  "createDatabase" should {
-    "use factory to create database from config" in new Setup {
-      dbFactory.forConfig("db", config) returns database
+  it should "use factory to create database from config" in new Setup {
+    when(dbFactory.forConfig("db", config)).thenReturn(database)
 
-      creator.createDatabase(config) must_== database
-    }
+    assert(creator.createDatabase(config) == database)
   }
 }

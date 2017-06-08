@@ -6,11 +6,11 @@ import net.i2p.crypto.eddsa.{EdDSAEngine, KeyPairGenerator}
 import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain.keys.KeyDomain._
 import org.leveloneproject.central.kms.util.Bytes
-import org.specs2.mutable.Specification
-import org.specs2.specification.Scope
+import org.scalatest.FlatSpec
+import org.scalatest.mockito.MockitoSugar
 
-class VerifierSpec extends Specification with AwaitResult {
-  trait Setup extends Scope {
+class VerifierSpec extends FlatSpec with MockitoSugar with AwaitResult {
+  trait Setup {
     val keyPair: KeyPair = (new KeyPairGenerator).generateKeyPair()
     val engine = new EdDSAEngine()
     engine.initSign(keyPair.getPrivate)
@@ -21,24 +21,22 @@ class VerifierSpec extends Specification with AwaitResult {
     val verifier = new Verifier()
   }
 
-  "verify" should {
-    "return true if signature is generated from privateKey" in new Setup {
-      verifier.verify(publicKey, signature, message) must beRight(ValidateResponses.Success)
-    }
+  "verify" should "return true if signature is generated from privateKey" in new Setup {
+    assert(verifier.verify(publicKey, signature, message) == Right(ValidateResponses.Success))
+  }
 
-    "return false if message differs from signature" in new Setup {
-      verifier.verify(publicKey, signature, message + " ") must beLeft(ValidateErrors.InvalidSignature)
-    }
+  it should "return false if message differs from signature" in new Setup {
+    assert(verifier.verify(publicKey, signature, message + " ") == Left(ValidateErrors.InvalidSignature))
+  }
 
-    "return false if signature differs from message" in new Setup {
-      verifier.verify(publicKey, signature.replace('A', 'B'), message) must beLeft(ValidateErrors.InvalidSignature)
-    }
+  it should "return false if signature differs from message" in new Setup {
+    assert(verifier.verify(publicKey, signature.replace('A', 'B'), message) == Left(ValidateErrors.InvalidSignature))
+  }
 
-    "be able to verify many times" in new Setup {
-      verifier.verify(publicKey, signature, message) must beRight(ValidateResponses.Success)
-      verifier.verify(publicKey, signature, message + " ") must beLeft(ValidateErrors.InvalidSignature)
-      verifier.verify(publicKey, signature.replace('A', 'B'), message) must beLeft(ValidateErrors.InvalidSignature)
-      verifier.verify(publicKey, signature, message) must beRight(ValidateResponses.Success)
-    }
+  it should "be able to verify many times" in new Setup {
+    assert(verifier.verify(publicKey, signature, message) == Right(ValidateResponses.Success))
+    assert(verifier.verify(publicKey, signature, message + " ") == Left(ValidateErrors.InvalidSignature))
+    assert(verifier.verify(publicKey, signature.replace('A', 'B'), message) == Left(ValidateErrors.InvalidSignature))
+    assert(verifier.verify(publicKey, signature, message) == Right(ValidateResponses.Success))
   }
 }

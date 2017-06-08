@@ -5,78 +5,84 @@ import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain.keys.KeyDomain._
-import org.specs2.mock.Mockito
-import org.specs2.mutable.Specification
-import org.specs2.specification.Scope
+import org.mockito.ArgumentMatchers._
+import org.mockito.Mockito._
+import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.mockito.MockitoSugar
 
 import scala.concurrent.Future
 
-class KeyServiceSpec extends Specification with Mockito with AwaitResult {
+class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with AwaitResult {
 
-  trait Setup extends Scope {
+  trait Setup {
     val keyGenerator: KeyGenerator = mock[KeyGenerator]
     val store: KeyStore = mock[KeyStore]
     val verifier: Verifier = mock[Verifier]
     val keyService = new KeyService(keyGenerator, store, verifier)
     val keyId: UUID = UUID.randomUUID()
+    val serviceName: String = UUID.randomUUID().toString
   }
 
-  "create" should {
-    "generate and return key" in new Setup {
-      val privateKey = "some private key"
-      val key = Key(keyId, "some public key")
-      store.create(any[Key]) returns Future(key)
-      keyGenerator.generate returns Future(PublicPrivateKeyPair(keyId, "", privateKey))
+  "create" should "generate and return key" in new Setup {
+    val privateKey = "some private key"
+    val key = Key(keyId, serviceName, "some public key")
+    when(store.create(any[Key])).thenReturn(Future(Right(key)))
+    when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair("", privateKey)))
 
-      val result: KeyResponse = await(keyService.create(KeyRequest()))
-      result.id must_== keyId
-      result.privateKey must_== privateKey
-    }
-
-    "save key to store" in new Setup {
-      val publicKey = "some public key"
-      val privateKey = "some private key"
-      val key = Key(keyId, publicKey)
-      store.create(key) returns Future(key)
-
-      keyGenerator.generate returns Future(PublicPrivateKeyPair(keyId, publicKey, privateKey))
-
-      await(keyService.create(KeyRequest()))
-
-      there was one(store).create(key)
-    }
+    await(keyService.create(KeyRequest(keyId, serviceName))) shouldBe Right(KeyResponse(keyId, serviceName, privateKey))
   }
 
-  "validate" should {
-    "return not found response if key not in store" in new Setup {
-      store.getById(keyId) returns Future(None)
+  it should "save key to store" in new Setup {
+    val publicKey = "some public key"
+    val privateKey = "some private key"
+    val key = Key(keyId, serviceName, publicKey)
+    when(store.create(key)).thenReturn(Future(Right(key)))
 
-      val result: Either[ValidateError, ValidateResponse] = await(keyService.validate(ValidateRequest(keyId, "", "")))
-      result must beLeft(ValidateErrors.KeyNotFound)
-    }
+    when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair(publicKey, privateKey)))
 
-    "return invalid signature response if signature not verified" in new Setup {
-      private val publicKey = mock[PublicKey]
-      private val key = mock[Key]
-      key.cryptoKey returns publicKey
-      store.getById(keyId) returns Future(Some(key))
-      private val signature = "signature"
-      private val message = "message"
-      verifier.verify(publicKey, signature, message) returns Left(ValidateErrors.InvalidSignature)
+    await(keyService.create(KeyRequest(keyId, serviceName)))
 
-      await(keyService.validate(ValidateRequest(keyId, signature, message))) must beLeft(ValidateErrors.InvalidSignature)
-    }
-
-    "return success if signature verified" in new Setup {
-      private val publicKey = mock[PublicKey]
-      private val key = mock[Key]
-      key.cryptoKey returns publicKey
-      store.getById(keyId) returns Future(Some(key))
-      private val signature = "signature"
-      private val message = "message"
-      verifier.verify(publicKey, signature, message) returns Right(ValidateResponses.Success)
-
-      await(keyService.validate(ValidateRequest(keyId, signature, message))) must beRight(ValidateResponses.Success)
-    }
+    verify(store).create(key)
   }
+
+  it should "return createError from keystore" in new Setup {
+    private val error = new CreateError { val message = "test"}
+    when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair("", "")))
+    when(store.create(any())).thenReturn(Future(Left(error)))
+
+    await(keyService.create(KeyRequest(UUID.randomUUID(), serviceName))) shouldBe Left(error)
+  }
+
+
+  "validate" should "return not found response if key not in store" in new Setup {
+    when(store.getById(keyId)).thenReturn(Future(None))
+
+    val result: Either[ValidateError, ValidateResponse] = await(keyService.validate(ValidateRequest(keyId, "", "")))
+    assert(result == Left(ValidateErrors.KeyNotFound))
+  }
+
+  it should "return invalid signature response if signature not verified" in new Setup {
+    private val publicKey = mock[PublicKey]
+    private val key = mock[Key]
+    when(key.cryptoKey).thenReturn(publicKey)
+    when(store.getById(keyId)).thenReturn(Future(Some(key)))
+    private val signature = "signature"
+    private val message = "message"
+    when(verifier.verify(publicKey, signature, message)).thenReturn(Left(ValidateErrors.InvalidSignature))
+
+    assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Left(ValidateErrors.InvalidSignature))
+  }
+
+  it should "return success if signature verified" in new Setup {
+    private val publicKey = mock[PublicKey]
+    private val key = mock[Key]
+    when(key.cryptoKey).thenReturn(publicKey)
+    when(store.getById(keyId)).thenReturn(Future(Some(key)))
+    private val signature = "signature"
+    private val message = "message"
+    when(verifier.verify(publicKey, signature, message)).thenReturn(Right(ValidateResponses.Success))
+
+    assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Right(ValidateResponses.Success))
+  }
+
 }
