@@ -4,7 +4,9 @@ import java.security.PublicKey
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
+import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.domain.keys.KeyDomain._
+import org.leveloneproject.central.kms.persistance.KeyStore
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import org.scalatest.{FlatSpec, Matchers}
@@ -46,7 +48,7 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
   }
 
   it should "return createError from keystore" in new Setup {
-    private val error = new CreateError { val message = "test"}
+    private val error = Error(500, "any message")
     when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair("", "")))
     when(store.create(any())).thenReturn(Future(Left(error)))
 

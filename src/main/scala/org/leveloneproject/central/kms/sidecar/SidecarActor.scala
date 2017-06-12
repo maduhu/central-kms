@@ -1,36 +1,40 @@
 package org.leveloneproject.central.kms.sidecar
 
-import akka.actor.{Actor, ActorRef, Props}
-import org.leveloneproject.central.kms.domain.keys.KeyDomain.KeyRequest
-import org.leveloneproject.central.kms.domain.keys.KeyService
-import org.leveloneproject.central.kms.socket.RpcErrors
+import java.util.UUID
 
-class SidecarActor(keyService: KeyService) extends Actor with CreateErrorConverter {
+import akka.actor.{Actor, ActorRef, Props}
+import org.leveloneproject.central.kms.domain.{ErrorWithCommandId, Errors}
+import org.leveloneproject.central.kms.domain.batches.BatchService
+import org.leveloneproject.central.kms.domain.keys.KeyService
+import org.leveloneproject.central.kms.sidecar.batch._
+import org.leveloneproject.central.kms.sidecar.registration._
+
+class SidecarActor(keyService: KeyService, batchService: BatchService) extends Actor {
 
   import context._
 
   def connected(out: ActorRef): Receive = {
     case RegisterCommand(id, registerParameters) ⇒
-      keyService.create(KeyRequest(registerParameters.id, registerParameters.serviceName))
-        .map {
-          _.fold(
-            cr ⇒ out ! toRegistrationError(id, cr),
-            key ⇒ {
-              become(registered(out))
-              out ! Registered(id, RegisteredResult(key.id, key.privateKey, ""))
-            })
-        }.recover {
-        case _: Throwable ⇒
-          out ! RpcErrors.InternalError
-      }
-
-    case x: SideCarCommand ⇒ out ! RpcErrors.MethodNotFound(x.commandId)
+      keyService.create(registerParameters.toKeyRequest()).map {
+        _.fold(
+          e ⇒ ErrorWithCommandId(e, id),
+          key ⇒ {
+            become(registered(key.id, out))
+            Registered(id, RegisteredResult(key.id, key.privateKey, ""))
+          }
+        )
+      }.map { result ⇒ out ! result }
+    case x: SideCarCommand ⇒ out ! Errors.MethodNotAllowedInCurrentState(x)
     case x ⇒ out ! x
   }
 
-  def registered(out: ActorRef): Receive = {
-    case command: SideCarCommand ⇒ out ! SidecarErrors.MethodNotAllowedInCurrentState(command)
-    case _ ⇒ out ! _
+  def registered(sidecarId: UUID, out: ActorRef): Receive = {
+    case BatchCommand(id, batchParameters) ⇒
+      batchService.create(batchParameters.toCreateRequest(sidecarId)).map {
+        _.fold(e ⇒ ErrorWithCommandId(e, id), batch ⇒ BatchCreated(id, BatchCreatedResult(batch.id)))
+      }.map { result ⇒ out ! result }
+    case x: SideCarCommand ⇒ out ! Errors.MethodNotAllowedInCurrentState(x)
+    case x ⇒ out ! x
   }
 
   def receive: Receive = {
@@ -39,8 +43,7 @@ class SidecarActor(keyService: KeyService) extends Actor with CreateErrorConvert
 }
 
 object SidecarActor {
-  def props(keyService: KeyService) = Props(new SidecarActor(keyService))
+  def props(keyService: KeyService, batchService: BatchService) = Props(new SidecarActor(keyService, batchService))
 
   case class Connected(outgoing: ActorRef)
-
 }

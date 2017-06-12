@@ -5,7 +5,7 @@ import org.leveloneproject.central.kms.domain.Error
 
 trait Output
 
-case class RpcInput(jsonrpc: String, id: Option[String], method: String, params: JValue)
+case class RpcRequest(jsonrpc: String, id: Option[String], method: String, params: JValue)
 
 case class RpcError(jsonrpc: String = "2.0", error: Error, id: String = null) extends Output
 

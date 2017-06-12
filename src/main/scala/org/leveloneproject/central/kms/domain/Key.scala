@@ -1,4 +1,4 @@
-package org.leveloneproject.central.kms.domain.keys
+package org.leveloneproject.central.kms.domain
 
 import java.security.PublicKey
 import java.security.spec.X509EncodedKeySpec

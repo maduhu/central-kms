@@ -1,9 +1,10 @@
-package org.leveloneproject.central.kms.persistance.postgres
+package org.leveloneproject.central.kms.domain.keys
 
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.keys._
+import org.leveloneproject.central.kms.domain.{Errors, Key}
+import org.leveloneproject.central.kms.persistance.{KeyRepository, KeyStore}
 import org.mockito.Mockito._
 import org.postgresql.util.PSQLException
 import org.scalatest.mockito.MockitoSugar
@@ -11,11 +12,11 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
 
-class PostgresKeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitResult {
+class KeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitResult {
 
   trait Setup {
-    val keysRepo: KeysRepo = mock[KeysRepo]
-    val keyStore = new PostgresKeyStore(keysRepo)
+    val keysRepo: KeyRepository = mock[KeyRepository]
+    val keyStore = new KeyStore(keysRepo)
   }
 
   "create" should "return DuplicateKey error when PrimaryKeyViolation thrown" in new Setup {
@@ -25,24 +26,15 @@ class PostgresKeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with
     val key = Key(keyId, "service name", "public key")
     when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
 
-    await(keyStore.create(key)) shouldBe Left(CreateError.KeyExists(keyId))
+    await(keyStore.create(key)) shouldBe Left(Errors.SidecarExistsError(keyId))
   }
 
-  it should "return DatabaseFailed" in new Setup {
+  it should "return InternalError on exception" in new Setup {
     private val exception = mock[PSQLException]
     private val keyId = UUID.randomUUID()
     val key = Key(keyId, "service name", "public key")
     when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
 
-    await(keyStore.create(key)) shouldBe Left(CreateError.DatabaseFailed())
-  }
-
-  it should "return CreateFailed when exception thrown" in new Setup {
-    private val exception = mock[Exception]
-    private val keyId = UUID.randomUUID()
-    val key = Key(keyId, "service name", "public key")
-    when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
-
-    await(keyStore.create(key)) shouldBe Left(CreateError.CreateFailed())
+    await(keyStore.create(key)) shouldBe Left(Errors.InternalError)
   }
 }

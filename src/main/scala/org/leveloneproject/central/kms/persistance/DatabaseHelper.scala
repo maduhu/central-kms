@@ -4,4 +4,6 @@ import java.sql.SQLException
 
 trait DatabaseHelper {
   def isPrimaryKeyViolation(ex: SQLException) = ex.getSQLState == "23505"
+
+
 }

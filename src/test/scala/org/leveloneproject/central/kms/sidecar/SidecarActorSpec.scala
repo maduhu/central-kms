@@ -1,16 +1,20 @@
 package org.leveloneproject.central.kms.sidecar
 
+import java.time.Instant
 import java.util.UUID
 
 import akka.actor.ActorRef
 import akka.testkit.TestProbe
-import org.leveloneproject.central.kms.domain.keys.KeyDomain.{KeyRequest, KeyResponse}
-import org.leveloneproject.central.kms.domain.keys.{CreateError, KeyService}
-import org.leveloneproject.central.kms.domain.{Error, ErrorWithCommandId}
-import org.leveloneproject.central.kms.socket.RpcErrors
+import org.leveloneproject.central.kms.domain.batches._
+import org.leveloneproject.central.kms.domain.keys.KeyDomain._
+import org.leveloneproject.central.kms.domain.keys._
+import org.leveloneproject.central.kms.domain._
+import org.leveloneproject.central.kms.sidecar.batch._
+import org.leveloneproject.central.kms.sidecar.registration._
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
+import org.mockito.stubbing.OngoingStubbing
 import org.scalatest.FlatSpec
 import org.scalatest.mockito.MockitoSugar
 
@@ -23,17 +27,36 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with MockitoSugar {
     val out = TestProbe()
     val outRef: ActorRef = out.ref
     val keyService: KeyService = mock[KeyService]
-    val sidecarActor: ActorRef = system.actorOf(SidecarActor.props(keyService))
-    val defaultTimeout: FiniteDuration = 500.milliseconds
+    val batchService: BatchService = mock[BatchService]
+    val sidecarActor: ActorRef = system.actorOf(SidecarActor.props(keyService, batchService))
+    val defaultTimeout: FiniteDuration = 100.milliseconds
 
     final val serviceName = "service name"
     final val sidecarId: UUID = UUID.randomUUID()
     final val commandId = "commandId"
+    final val privateKey = "some private key"
+
+    def setupRegistration(): OngoingStubbing[Future[Either[Error, KeyResponse]]] = {
+      when(keyService.create(KeyRequest(sidecarId, serviceName))).thenReturn(Future.successful(Right(KeyResponse(sidecarId, serviceName, privateKey))))
+    }
+
+    def connectSidecar(): Unit = {
+      sidecarActor ! SidecarActor.Connected(outRef)
+      out.expectNoMsg(defaultTimeout)
+    }
+
+    def registerSidecar(): Unit = {
+      sidecarActor ! RegisterCommand(commandId, RegisterParameters(sidecarId, serviceName))
+    }
+
+    def connectAndRegisterSidecar(): Unit = {
+      connectSidecar()
+      registerSidecar()
+    }
   }
 
   "sidecar actor" should "accept Sidecar.Connect message" in new Setup {
-    sidecarActor ! SidecarActor.Connected(outRef)
-    out.expectNoMsg(500.milliseconds)
+    connectSidecar()
   }
 
   it should "not respond to register command when not connected" in new Setup {
@@ -43,49 +66,48 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with MockitoSugar {
   }
 
   it should "send error to out when key service throws error" in new Setup {
-    val exception = new Exception()
-    when(keyService.create(KeyRequest(sidecarId, serviceName))).thenReturn(Future.failed(exception))
+    val error = Error(500, "some message")
+    when(keyService.create(KeyRequest(sidecarId, serviceName))).thenReturn(Future.successful(Left(error)))
 
-    sidecarActor ! SidecarActor.Connected(outRef)
+    connectAndRegisterSidecar()
 
-    sidecarActor ! RegisterCommand(commandId, RegisterParameters(sidecarId, serviceName))
-    out.expectMsg(defaultTimeout, RpcErrors.InternalError)
+    out.expectMsg(ErrorWithCommandId(error, commandId))
   }
 
   it should "send registered to out when registering" in new Setup {
-    sidecarActor ! SidecarActor.Connected(outRef)
-
-    out.expectNoMsg(500.milliseconds)
-
-    private val privateKey = "some private key"
-    when(keyService.create(KeyRequest(sidecarId, serviceName))).thenReturn(Future.successful(Right(KeyResponse(sidecarId, serviceName, privateKey))))
-
-    sidecarActor ! RegisterCommand(commandId, RegisterParameters(sidecarId, serviceName))
+    setupRegistration()
+    connectAndRegisterSidecar()
     out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
   }
 
   it should "send method not allowed to out when registering twice" in new Setup {
-    sidecarActor ! SidecarActor.Connected(outRef)
+    setupRegistration()
 
-    out.expectNoMsg(500.milliseconds)
-
-    private val privateKey = "some private key"
-    when(keyService.create(KeyRequest(sidecarId, serviceName))).thenReturn(Future.successful(Right(KeyResponse(sidecarId, serviceName, privateKey))))
-
-    sidecarActor ! RegisterCommand(commandId, RegisterParameters(sidecarId, serviceName))
+    connectAndRegisterSidecar()
     out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
-    sidecarActor ! RegisterCommand(commandId, RegisterParameters(sidecarId, serviceName))
-    out.expectMsg(defaultTimeout, ErrorWithCommandId(Error(100, "'register' method not allowed in current state"), commandId))
+    registerSidecar()
+    out.expectMsg(ErrorWithCommandId(Error(100, "'register' method not allowed in current state"), commandId))
   }
 
   it should "send duplicate sidecar registered error to out" in new Setup {
-
-    private val exists = CreateError.KeyExists(sidecarId)
+    private val exists = Errors.SidecarExistsError(sidecarId)
     when(keyService.create(any())).thenReturn(Future.successful(Left(exists)))
-    sidecarActor ! SidecarActor.Connected(outRef)
+    connectAndRegisterSidecar()
+    out.expectMsg(ErrorWithCommandId(exists, commandId))
+  }
 
-    sidecarActor ! RegisterCommand(commandId, RegisterParameters(sidecarId, serviceName))
+  it should "save batch when registered and send batch to out" in new Setup {
+    setupRegistration()
+    connectAndRegisterSidecar()
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
 
-    out.expectMsg(SidecarErrors.DuplicateSidecarRegistered(commandId, exists.message))
+    private val batchId = UUID.randomUUID()
+    private val signature = "signature"
+
+    when(batchService.create(CreateRequest(sidecarId,batchId, signature)))
+      .thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
+
+    sidecarActor ! BatchCommand(commandId, BatchParameters(batchId, signature))
+    out.expectMsg(BatchCreated(commandId, BatchCreatedResult(batchId)))
   }
 }
