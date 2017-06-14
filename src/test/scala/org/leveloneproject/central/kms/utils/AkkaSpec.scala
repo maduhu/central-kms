@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 
 trait AkkaSpec extends BeforeAndAfterAll { this: Suite ⇒
 
-  protected implicit val system = ActorSystem()
+  implicit val system = ActorSystem()
 
   override protected def afterAll(): Unit = {
     Await.ready(system.terminate(), 10.seconds)

@@ -1,15 +1,13 @@
 package org.leveloneproject.central.kms.sidecar
 
-import org.json4s.ext.JavaTypesSerializers
-import org.json4s.{DefaultFormats, MappingException, _}
+import org.json4s.{MappingException, _}
 import org.leveloneproject.central.kms.domain.{ErrorWithCommandId, Errors}
 import org.leveloneproject.central.kms.sidecar.batch._
 import org.leveloneproject.central.kms.sidecar.registration._
 import org.leveloneproject.central.kms.socket.RpcRequest
+import org.leveloneproject.central.kms.util.JsonFormats
 
-trait SideCarCommandConverter {
-
-  implicit val formats: Formats = DefaultFormats ++ JavaTypesSerializers.all
+trait SideCarCommandConverter extends JsonFormats {
 
   def toSideCarCommand(input: RpcRequest): Either[ErrorWithCommandId, SideCarCommand] = {
     try {

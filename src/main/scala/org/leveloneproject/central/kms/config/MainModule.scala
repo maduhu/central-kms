@@ -12,9 +12,9 @@ import net.i2p.crypto.eddsa.KeyPairGenerator
 import org.flywaydb.core.Flyway
 import org.leveloneproject.central.kms.Service
 import org.leveloneproject.central.kms.domain.keys.KeyGenerator
-import org.leveloneproject.central.kms.persistance.postgres.{PostgresBatchRepository, PostgresDbProvider, PostgresKeyRepository}
 import org.leveloneproject.central.kms.persistance._
-import org.leveloneproject.central.kms.routing.{RouteAggregator, Router}
+import org.leveloneproject.central.kms.persistance.postgres._
+import org.leveloneproject.central.kms.routing.{RouteAggregator, Router, SidecarRouter}
 import org.leveloneproject.central.kms.socket.SocketRouter
 
 class MainModule(config: Config) extends ScalaModule {
@@ -30,6 +30,7 @@ class MainModule(config: Config) extends ScalaModule {
     bind[DbProvider].to[PostgresDbProvider]
     bind[BatchRepository].to[PostgresBatchRepository]
     bind[KeyRepository].to[PostgresKeyRepository]
+    bind[SidecarRepository].to[PostgresSidecarRepository]
     bind[Clock].toInstance(Clock.systemUTC())
     bind[KeyStore]
     bind[Flyway]
@@ -44,6 +45,7 @@ class MainModule(config: Config) extends ScalaModule {
   def bindRouters(): Unit = {
     val routerBinder = ScalaMultibinder.newSetBinder[Router](binder)
     routerBinder.addBinding.to[SocketRouter]
+    routerBinder.addBinding.to[SidecarRouter]
   }
 
 }

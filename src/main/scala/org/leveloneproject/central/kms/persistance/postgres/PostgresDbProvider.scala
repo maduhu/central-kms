@@ -8,6 +8,5 @@ class PostgresDbProvider @Inject()(config: Config) extends DbProvider with Postg
 
   import profile.api._
 
-  val db: profile.api.Database = Database.forConfig("db", config)
-
+  lazy val db: profile.api.Database = Database.forConfig("db", config)
 }

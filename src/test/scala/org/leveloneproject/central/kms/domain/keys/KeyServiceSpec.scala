@@ -5,12 +5,11 @@ import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain._
-import org.leveloneproject.central.kms.domain.keys.KeyDomain._
 import org.leveloneproject.central.kms.persistance.KeyStore
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
-import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
 
@@ -23,26 +22,26 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
     val keyService = new KeyService(keyGenerator, store, verifier)
     val keyId: UUID = UUID.randomUUID()
     val serviceName: String = UUID.randomUUID().toString
+
+    final val publicKey = "some public key"
+    final val privateKey = "some private key"
   }
 
   "create" should "generate and return key" in new Setup {
-    val privateKey = "some private key"
-    val key = Key(keyId, serviceName, "some public key")
+    val key = Key(keyId, "some public key")
     when(store.create(any[Key])).thenReturn(Future(Right(key)))
-    when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair("", privateKey)))
+    when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair(publicKey, privateKey)))
 
-    await(keyService.create(KeyRequest(keyId, serviceName))) shouldBe Right(KeyResponse(keyId, serviceName, privateKey))
+    await(keyService.create(CreateKeyRequest(keyId))) shouldBe Right(CreateKeyResponse(keyId, publicKey, privateKey))
   }
 
   it should "save key to store" in new Setup {
-    val publicKey = "some public key"
-    val privateKey = "some private key"
-    val key = Key(keyId, serviceName, publicKey)
+    val key = Key(keyId, publicKey)
     when(store.create(key)).thenReturn(Future(Right(key)))
 
     when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair(publicKey, privateKey)))
 
-    await(keyService.create(KeyRequest(keyId, serviceName)))
+    await(keyService.create(CreateKeyRequest(keyId)))
 
     verify(store).create(key)
   }
@@ -52,7 +51,7 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
     when(keyGenerator.generate()).thenReturn(Future(PublicPrivateKeyPair("", "")))
     when(store.create(any())).thenReturn(Future(Left(error)))
 
-    await(keyService.create(KeyRequest(UUID.randomUUID(), serviceName))) shouldBe Left(error)
+    await(keyService.create(CreateKeyRequest(UUID.randomUUID()))) shouldBe Left(error)
   }
 
 
@@ -64,25 +63,25 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
   }
 
   it should "return invalid signature response if signature not verified" in new Setup {
-    private val publicKey = mock[PublicKey]
+    private val pubKey = mock[PublicKey]
     private val key = mock[Key]
-    when(key.cryptoKey).thenReturn(publicKey)
+    when(key.cryptoKey).thenReturn(pubKey)
     when(store.getById(keyId)).thenReturn(Future(Some(key)))
     private val signature = "signature"
     private val message = "message"
-    when(verifier.verify(publicKey, signature, message)).thenReturn(Left(ValidateErrors.InvalidSignature))
+    when(verifier.verify(pubKey, signature, message)).thenReturn(Left(ValidateErrors.InvalidSignature))
 
     assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Left(ValidateErrors.InvalidSignature))
   }
 
   it should "return success if signature verified" in new Setup {
-    private val publicKey = mock[PublicKey]
+    private val pubKey = mock[PublicKey]
     private val key = mock[Key]
-    when(key.cryptoKey).thenReturn(publicKey)
+    when(key.cryptoKey).thenReturn(pubKey)
     when(store.getById(keyId)).thenReturn(Future(Some(key)))
     private val signature = "signature"
     private val message = "message"
-    when(verifier.verify(publicKey, signature, message)).thenReturn(Right(ValidateResponses.Success))
+    when(verifier.verify(pubKey, signature, message)).thenReturn(Right(ValidateResponses.Success))
 
     assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Right(ValidateResponses.Success))
   }

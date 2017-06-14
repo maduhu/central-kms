@@ -3,38 +3,41 @@ package org.leveloneproject.central.kms.sidecar
 import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Props}
-import org.leveloneproject.central.kms.domain.{ErrorWithCommandId, Errors}
+import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.domain.batches.BatchService
-import org.leveloneproject.central.kms.domain.keys.KeyService
+import org.leveloneproject.central.kms.domain.sidecars.SidecarService
+import org.leveloneproject.central.kms.sidecar.SidecarActor.SidecarWithOutSocket
 import org.leveloneproject.central.kms.sidecar.batch._
 import org.leveloneproject.central.kms.sidecar.registration._
+import org.leveloneproject.central.kms.util.FutureEither
 
-class SidecarActor(keyService: KeyService, batchService: BatchService) extends Actor {
+class SidecarActor(batchService: BatchService, sidecarService: SidecarService) extends Actor {
 
   import context._
 
   def connected(out: ActorRef): Receive = {
     case RegisterCommand(id, registerParameters) ⇒
-      keyService.create(registerParameters.toKeyRequest()).map {
-        _.fold(
-          e ⇒ ErrorWithCommandId(e, id),
-          key ⇒ {
-            become(registered(key.id, out))
-            Registered(id, RegisteredResult(key.id, key.privateKey, ""))
-          }
-        )
-      }.map { result ⇒ out ! result }
+      FutureEither(sidecarService.register(registerParameters)) map { r ⇒
+        val sidecar = r.sidecar
+        val keyResponse = r.keyResponse
+        become(registered(SidecarWithOutSocket(sidecar, out)))
+        out ! Registered(id, RegisteredResult(sidecar.id, keyResponse.privateKey, ""))
+      } recover {
+        case x: Error ⇒ out ! ErrorWithCommandId(x, id)
+      }
     case x: SideCarCommand ⇒ out ! Errors.MethodNotAllowedInCurrentState(x)
+    case SidecarActor.Disconnect ⇒ context.stop(self)
     case x ⇒ out ! x
   }
 
-  def registered(sidecarId: UUID, out: ActorRef): Receive = {
+  def registered(sidecarWithActor: SidecarWithOutSocket): Receive = {
     case BatchCommand(id, batchParameters) ⇒
-      batchService.create(batchParameters.toCreateRequest(sidecarId)).map {
+      batchService.create(batchParameters.toCreateRequest(sidecarWithActor.sidecarId)).map {
         _.fold(e ⇒ ErrorWithCommandId(e, id), batch ⇒ BatchCreated(id, BatchCreatedResult(batch.id)))
-      }.map { result ⇒ out ! result }
-    case x: SideCarCommand ⇒ out ! Errors.MethodNotAllowedInCurrentState(x)
-    case x ⇒ out ! x
+      }.map { result ⇒ sidecarWithActor.socket ! result }
+    case x: SideCarCommand ⇒ sidecarWithActor.socket ! Errors.MethodNotAllowedInCurrentState(x)
+    case SidecarActor.Disconnect ⇒ sidecarService.terminate(sidecarWithActor.sidecar) map { _ ⇒ context.stop(self) }
+    case x ⇒ sidecarWithActor.socket ! x
   }
 
   def receive: Receive = {
@@ -43,7 +46,11 @@ class SidecarActor(keyService: KeyService, batchService: BatchService) extends A
 }
 
 object SidecarActor {
-  def props(keyService: KeyService, batchService: BatchService) = Props(new SidecarActor(keyService, batchService))
+  def props(batchService: BatchService, sidecarService: SidecarService) = Props(new SidecarActor(batchService, sidecarService))
 
   case class Connected(outgoing: ActorRef)
+  case class Disconnect()
+  case class SidecarWithOutSocket(sidecar: Sidecar, socket: ActorRef) {
+    val sidecarId: UUID = sidecar.id
+  }
 }

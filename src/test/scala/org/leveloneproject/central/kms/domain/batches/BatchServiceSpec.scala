@@ -29,7 +29,7 @@ class BatchServiceSpec extends FlatSpec with Matchers with MockitoSugar with Awa
   "create" should "save batch to repo" in new Setup {
     when(repo.insert(any())).thenReturn(Future.successful((): Unit))
 
-    private val result = await(service.create(CreateRequest(sidecarId, batchId, "signature")))
+    private val result = await(service.create(CreateBatchRequest(sidecarId, batchId, "signature")))
     private val batch = Batch(batchId, sidecarId, "signature", now)
     result shouldBe Right(batch)
 
@@ -42,7 +42,7 @@ class BatchServiceSpec extends FlatSpec with Matchers with MockitoSugar with Awa
 
     when(repo.insert(any())).thenReturn(Future.failed(ex))
 
-    await(service.create(CreateRequest(sidecarId, batchId, "signature"))) shouldBe Left(Errors.BatchExistsError(batchId))
+    await(service.create(CreateBatchRequest(sidecarId, batchId, "signature"))) shouldBe Left(Errors.BatchExistsError(batchId))
   }
 
   it should "return InernalError if exception is thrown by repo" in new Setup {
@@ -50,7 +50,7 @@ class BatchServiceSpec extends FlatSpec with Matchers with MockitoSugar with Awa
 
     when(repo.insert(any())).thenReturn(Future.failed(ex))
 
-    await(service.create(CreateRequest(sidecarId, batchId, "signature"))) shouldBe Left(Errors.InternalError)
+    await(service.create(CreateBatchRequest(sidecarId, batchId, "signature"))) shouldBe Left(Errors.InternalError)
   }
 
 

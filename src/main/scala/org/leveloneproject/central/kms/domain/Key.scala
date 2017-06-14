@@ -7,6 +7,6 @@ import java.util.UUID
 import net.i2p.crypto.eddsa.EdDSAPublicKey
 import org.leveloneproject.central.kms.util.Bytes
 
-case class Key(id: UUID, serviceName: String, publicKey: String) {
+case class Key(id: UUID, publicKey: String) {
   lazy val cryptoKey: PublicKey = new EdDSAPublicKey(new X509EncodedKeySpec(Bytes.fromHex(publicKey)))
 }

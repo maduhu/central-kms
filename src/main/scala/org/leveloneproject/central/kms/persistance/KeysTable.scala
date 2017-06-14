@@ -11,9 +11,8 @@ trait KeysTable {
 
   class KeysTable(tag: Tag) extends Table[Key](tag, "Keys") {
     def id = column[UUID]("id")
-    def serviceName = column[String]("service_name")
     def publicKey = column[String]("public_key")
-    def * = (id, serviceName, publicKey) <> (Key.tupled, Key.unapply)
+    def * = (id, publicKey) <> (Key.tupled, Key.unapply)
   }
 
   val keys = TableQuery[KeysTable]

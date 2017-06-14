@@ -3,7 +3,6 @@ package org.leveloneproject.central.kms.domain.keys
 import java.security.PublicKey
 
 import net.i2p.crypto.eddsa.EdDSAEngine
-import org.leveloneproject.central.kms.domain.keys.KeyDomain._
 import org.leveloneproject.central.kms.util.Bytes
 
 class Verifier() {

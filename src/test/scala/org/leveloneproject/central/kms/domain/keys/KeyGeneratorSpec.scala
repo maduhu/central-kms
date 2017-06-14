@@ -4,7 +4,6 @@ import java.security.{KeyPair, KeyPairGeneratorSpi, PrivateKey, PublicKey}
 
 import net.i2p.crypto.eddsa.KeyPairGenerator
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.keys.KeyDomain.PublicPrivateKeyPair
 import org.leveloneproject.central.kms.util.Bytes
 import org.mockito.Mockito._
 import org.scalatest.FlatSpec

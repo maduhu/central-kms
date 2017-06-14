@@ -23,7 +23,7 @@ class KeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitRe
     private val exception = mock[PSQLException]
     when(exception.getSQLState).thenReturn("23505")
     private val keyId = UUID.randomUUID()
-    val key = Key(keyId, "service name", "public key")
+    val key = Key(keyId, "public key")
     when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
 
     await(keyStore.create(key)) shouldBe Left(Errors.SidecarExistsError(keyId))
@@ -32,7 +32,7 @@ class KeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitRe
   it should "return InternalError on exception" in new Setup {
     private val exception = mock[PSQLException]
     private val keyId = UUID.randomUUID()
-    val key = Key(keyId, "service name", "public key")
+    val key = Key(keyId, "public key")
     when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
 
     await(keyStore.create(key)) shouldBe Left(Errors.InternalError)

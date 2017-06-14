@@ -4,12 +4,12 @@ import java.security.{KeyPair, PublicKey}
 
 import net.i2p.crypto.eddsa.{EdDSAEngine, KeyPairGenerator}
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.keys.KeyDomain._
 import org.leveloneproject.central.kms.util.Bytes
 import org.scalatest.FlatSpec
 import org.scalatest.mockito.MockitoSugar
 
 class VerifierSpec extends FlatSpec with MockitoSugar with AwaitResult {
+
   trait Setup {
     val keyPair: KeyPair = (new KeyPairGenerator).generateKeyPair()
     val engine = new EdDSAEngine()
