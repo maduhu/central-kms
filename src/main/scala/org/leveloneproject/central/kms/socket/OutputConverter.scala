@@ -12,6 +12,7 @@ trait OutputConverter extends SideCarCommandConverter {
         case x: Error ⇒ Some(RpcError(error = x))
         case x: ErrorWithCommandId ⇒ Some(RpcError(error = x.error, id = x.commandId))
         case x: CommandResponse ⇒ Some(RpcResponse(result = x.result, id = x.id))
+        case x: CommandRequest ⇒ Some(RpcRequest(id = x.id, method = x.method, params = x.params))
         case _ ⇒ None
       }
     }

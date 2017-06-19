@@ -27,6 +27,8 @@ class FutureEither[L, R](private val future: Future[Either[L, R]]) {
       case Left(l) ⇒ block(l)
     }
   }
+
+  def toFuture(): Future[Either[L, R]] = future
 }
 
 object FutureEither {

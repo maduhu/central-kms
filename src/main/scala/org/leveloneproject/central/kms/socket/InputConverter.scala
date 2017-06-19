@@ -11,11 +11,11 @@ trait InputConverter extends SideCarCommandConverter {
 
   private def isEmpty(text: String) = text == null || text.isEmpty
 
-  def toRpcInput(text: String): Either[Error, RpcRequest] = {
+  def toRpcInput(text: String): Either[Error, SocketRequest] = {
     text match {
       case _ if isEmpty(text) ⇒ Left(Errors.ParseError)
       case _ ⇒ try {
-        Right(parse(text).extract[RpcRequest])
+        Right(parse(text).extract[SocketRequest])
       } catch {
         case _: ParseException ⇒ Left(Errors.ParseError)
         case _: MappingException ⇒ Left(Errors.InvalidRequest)
@@ -25,7 +25,7 @@ trait InputConverter extends SideCarCommandConverter {
   }
 
   def fromMessage(message: Message): Any = {
-    def collect(message: Message): Either[Error, RpcRequest] = {
+    def collect(message: Message): Either[Error, SocketRequest] = {
       message match {
         case TextMessage.Strict(text) ⇒ toRpcInput(text)
         case _ ⇒ Left(Errors.ParseError)

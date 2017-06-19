@@ -7,9 +7,11 @@ import akka.actor.ActorRef
 import akka.testkit.{TestActorRef, TestProbe}
 import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.domain.batches._
+import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheck, HealthCheckLevel, HealthCheckStatus}
 import org.leveloneproject.central.kms.domain.keys._
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterRequest, RegisterResponse, SidecarService}
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterRequest, RegisterResponse, Sidecar, SidecarService}
 import org.leveloneproject.central.kms.sidecar.batch._
+import org.leveloneproject.central.kms.sidecar.healthcheck.HealthCheckRequest
 import org.leveloneproject.central.kms.sidecar.registration._
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.ArgumentMatchers._
@@ -39,7 +41,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     def setupRegistration(): Sidecar = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey)
       val sidecar = Sidecar(sidecarId, serviceName, Instant.now())
-      when(sidecarService.register(RegisterRequest(sidecarId, serviceName))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarService.register(RegisterRequest(sidecarId, serviceName, sidecarActor))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
       sidecar
     }
 
@@ -78,7 +80,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
   it should "send error to out when sidecar service throws error" in new Setup {
     val error = Error(500, "some message")
-    when(sidecarService.register(RegisterRequest(sidecarId, serviceName))).thenReturn(Future.successful(Left(error)))
+    when(sidecarService.register(RegisterRequest(sidecarId, serviceName, sidecarActor))).thenReturn(Future.successful(Left(error)))
     connectAndRegisterSidecar()
 
     out.expectMsg(ErrorWithCommandId(error, commandId))
@@ -119,6 +121,20 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
     sidecarActor ! BatchCommand(commandId, BatchParameters(batchId, signature))
     out.expectMsg(BatchCreated(commandId, BatchCreatedResult(batchId)))
+  }
+
+  it should "send healthcheck request to websocket" in new Setup {
+    setupRegistration()
+    connectAndRegisterSidecar()
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
+
+    private val healthCheckId = UUID.randomUUID()
+    private val healthCheckLevel = HealthCheckLevel.Ping
+    private val healthCheck = HealthCheck(healthCheckId, sidecarId, healthCheckLevel, Instant.now(), HealthCheckStatus.Pending, None, None)
+
+    sidecarActor ! healthCheck
+
+    out.expectMsg(HealthCheckRequest(healthCheckId, healthCheckLevel))
   }
 
   it should "terminate sidecar and stop self when disconnected" in new Setup {

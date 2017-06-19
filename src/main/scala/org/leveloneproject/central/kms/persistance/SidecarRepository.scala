@@ -4,7 +4,8 @@ import java.sql.SQLException
 import java.time.Instant
 import java.util.UUID
 
-import org.leveloneproject.central.kms.domain.{Error, Errors, Sidecar}
+import org.leveloneproject.central.kms.domain.sidecars.Sidecar
+import org.leveloneproject.central.kms.domain.{Error, Errors}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

@@ -3,7 +3,7 @@ package org.leveloneproject.central.kms.persistance
 import java.time.Instant
 import java.util.UUID
 
-import org.leveloneproject.central.kms.domain.Batch
+import org.leveloneproject.central.kms.domain.batches.Batch
 
 trait BatchesTable extends DataMappers {
   this: DbProfile ⇒

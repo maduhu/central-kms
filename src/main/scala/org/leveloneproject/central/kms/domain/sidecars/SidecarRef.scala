@@ -4,4 +4,4 @@ import java.util.UUID
 
 import akka.actor.ActorRef
 
-case class RegisterRequest(id: UUID, serviceName: String, actor: ActorRef)
+case class SidecarRef(id: UUID, actor: ActorRef)

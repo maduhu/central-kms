@@ -18,4 +18,8 @@ object Errors {
   def MethodNotFound(commandId: String) = ErrorWithCommandId(Error(-32601, "Method not found"), commandId)
 
   def MethodNotAllowedInCurrentState(command: SideCarCommand) = ErrorWithCommandId(Error(100, "'%s' method not allowed in current state".format(command.method)), command.commandId)
+
+  def UnrecognizedLevelError(level: String) = Error(200, "Level invalid")
+
+  def UnregisteredSidecar(id: UUID) = Error(1400, "Sidecar '%s' is not registered".format(id))
 }

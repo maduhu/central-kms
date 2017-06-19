@@ -1,7 +1,7 @@
 package org.leveloneproject.central.kms.socket
 
 import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem, PoisonPill}
+import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
@@ -10,10 +10,8 @@ import org.leveloneproject.central.kms.domain.batches.BatchService
 import org.leveloneproject.central.kms.domain.sidecars.SidecarService
 import org.leveloneproject.central.kms.sidecar.SidecarActor
 
-class WebSocketService @Inject()(batchService: BatchService, sidecarService: SidecarService) extends InputConverter with OutputConverter {
-  implicit val system = ActorSystem()
-  implicit val materializer = ActorMaterializer()
-
+class WebSocketService @Inject()(batchService: BatchService, sidecarService: SidecarService)
+                                (implicit val system: ActorSystem, implicit val materializer: ActorMaterializer) extends InputConverter with OutputConverter {
 
   private def commandExecutionFlow(sidecarActor: ActorRef): Flow[Any, Any, NotUsed] = {
     val inputFlow = Flow[Any].to(Sink.actorRef(sidecarActor, SidecarActor.Disconnect))

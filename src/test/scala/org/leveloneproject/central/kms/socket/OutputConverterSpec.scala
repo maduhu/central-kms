@@ -29,6 +29,13 @@ class OutputConverterSpec extends FlatSpec with Matchers {
     converter.toMessage(response) shouldBe Some(TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"result\":{\"id\":\"some id\",\"value\":100},\"id\":\"commandid\"}"))
   }
 
+  it should "convert command request to rpc request" in new Setup {
+    val r = CommandRequest("some id", "method", SomeResponse("response id", 100))
+
+    converter.toMessage(r) shouldBe
+      Some(TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"id\":\"some id\",\"method\":\"method\",\"params\":{\"id\":\"response id\",\"value\":100}}"))
+  }
+
   it should "return None for other Types" in new Setup {
     converter.toMessage(SomeResponse("fjdkfjdsl", 1000)) shouldBe None
     converter.toMessage("some string") shouldBe None

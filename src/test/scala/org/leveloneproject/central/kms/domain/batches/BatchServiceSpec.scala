@@ -5,7 +5,7 @@ import java.time.{Clock, Instant}
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.{Batch, Errors}
+import org.leveloneproject.central.kms.domain.Errors
 import org.leveloneproject.central.kms.persistance.BatchRepository
 import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers._

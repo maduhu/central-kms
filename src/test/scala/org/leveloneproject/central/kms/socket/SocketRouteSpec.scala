@@ -4,12 +4,13 @@ import java.time.Instant
 import java.util.UUID
 
 import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
-import org.leveloneproject.central.kms.domain.batches.{BatchService, CreateBatchRequest}
-import org.leveloneproject.central.kms.domain.keys.{CreateKeyResponse, KeyService}
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterRequest, RegisterResponse, SidecarService}
-import org.leveloneproject.central.kms.domain.{Batch, Errors, Sidecar}
+import org.leveloneproject.central.kms.domain.Errors
+import org.leveloneproject.central.kms.domain.batches.{Batch, BatchService, CreateBatchRequest}
+import org.leveloneproject.central.kms.domain.keys.CreateKeyResponse
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterRequest, RegisterResponse, Sidecar, SidecarService}
 import org.leveloneproject.central.kms.utils.MessageBuilder
 import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers.any
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -20,6 +21,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
   trait Setup {
     final val batchService: BatchService = mock[BatchService]
     final val sidecarService: SidecarService = mock[SidecarService]
+    final val webSocketService: WebSocketService = new WebSocketService(batchService, sidecarService)
     final val sidecarId: UUID = UUID.randomUUID()
     final val serviceName: String = "some service"
     final val publicKey: String = "public key"
@@ -28,12 +30,12 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     def setupRegistration(): Unit = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey)
       val sidecar = Sidecar(sidecarId, serviceName, Instant.now())
-      when(sidecarService.register(RegisterRequest(sidecarId, serviceName))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarService.register(RegisterRequest(sidecarId, serviceName, any()))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
     }
   }
 
   "socket router" should "be able to connect to websocket route" in new Setup {
-    val socketRouter = new SocketRouter(batchService, sidecarService)
+    val socketRouter = new SocketRouter(webSocketService)
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       isWebSocketUpgrade shouldBe true
@@ -42,7 +44,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
 
   it should "return error for invalid command" in new Setup {
     val parseError = Errors.ParseError
-    val socketRouter = new SocketRouter(batchService, sidecarService)
+    val socketRouter = new SocketRouter(webSocketService)
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage("test")
@@ -53,7 +55,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
   it should "return registered for register command" in new Setup {
     setupRegistration()
     private val requestId = "test"
-    val socketRouter = new SocketRouter(batchService, sidecarService)
+    val socketRouter = new SocketRouter(webSocketService)
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest(requestId, sidecarId, serviceName))
@@ -63,7 +65,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
 
   it should "return method not allowed error when already registered" in new Setup {
     setupRegistration()
-    val socketRouter = new SocketRouter(batchService, sidecarService)
+    val socketRouter = new SocketRouter(webSocketService)
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest("test", sidecarId, serviceName))
@@ -77,7 +79,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     setupRegistration()
     private val batchId = UUID.randomUUID()
     private val signature = "some signature"
-    val socketRouter = new SocketRouter(batchService, sidecarService)
+    val socketRouter = new SocketRouter(webSocketService)
     when(batchService.create(CreateBatchRequest(sidecarId, batchId, signature))).thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {

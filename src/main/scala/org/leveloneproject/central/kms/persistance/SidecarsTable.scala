@@ -3,7 +3,7 @@ package org.leveloneproject.central.kms.persistance
 import java.time.Instant
 import java.util.UUID
 
-import org.leveloneproject.central.kms.domain.Sidecar
+import org.leveloneproject.central.kms.domain.sidecars.Sidecar
 
 trait SidecarsTable extends DataMappers {
   this: DbProfile ⇒

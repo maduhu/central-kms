@@ -2,7 +2,7 @@ package org.leveloneproject.central.kms.persistance
 
 import java.util.UUID
 
-import org.leveloneproject.central.kms.domain.Key
+import org.leveloneproject.central.kms.domain.keys.Key
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

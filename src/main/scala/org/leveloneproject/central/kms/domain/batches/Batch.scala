@@ -1,4 +1,4 @@
-package org.leveloneproject.central.kms.domain
+package org.leveloneproject.central.kms.domain.batches
 
 import java.time.Instant
 import java.util.UUID

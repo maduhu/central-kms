@@ -5,9 +5,11 @@ import java.util.UUID
 import akka.actor.{Actor, ActorRef, Props}
 import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.domain.batches.BatchService
-import org.leveloneproject.central.kms.domain.sidecars.SidecarService
+import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
+import org.leveloneproject.central.kms.domain.sidecars.{Sidecar, SidecarService}
 import org.leveloneproject.central.kms.sidecar.SidecarActor.SidecarWithOutSocket
 import org.leveloneproject.central.kms.sidecar.batch._
+import org.leveloneproject.central.kms.sidecar.healthcheck.HealthCheckRequest
 import org.leveloneproject.central.kms.sidecar.registration._
 import org.leveloneproject.central.kms.util.FutureEither
 
@@ -26,7 +28,7 @@ class SidecarActor(batchService: BatchService, sidecarService: SidecarService) e
         case x: Error ⇒ out ! ErrorWithCommandId(x, id)
       }
     case x: SideCarCommand ⇒ out ! Errors.MethodNotAllowedInCurrentState(x)
-    case SidecarActor.Disconnect ⇒ context.stop(self)
+    case SidecarActor.Disconnect ⇒ stop(self)
     case x ⇒ out ! x
   }
 
@@ -35,13 +37,14 @@ class SidecarActor(batchService: BatchService, sidecarService: SidecarService) e
       batchService.create(batchParameters.toCreateRequest(sidecarWithActor.sidecarId)).map {
         _.fold(e ⇒ ErrorWithCommandId(e, id), batch ⇒ BatchCreated(id, BatchCreatedResult(batch.id)))
       }.map { result ⇒ sidecarWithActor.socket ! result }
+    case HealthCheck(id, _, level, _, _, _, _) ⇒ sidecarWithActor.socket ! HealthCheckRequest(id, level)
     case x: SideCarCommand ⇒ sidecarWithActor.socket ! Errors.MethodNotAllowedInCurrentState(x)
-    case SidecarActor.Disconnect ⇒ sidecarService.terminate(sidecarWithActor.sidecar) map { _ ⇒ context.stop(self) }
+    case SidecarActor.Disconnect ⇒ sidecarService.terminate(sidecarWithActor.sidecar) map { _ ⇒ stop(self) }
     case x ⇒ sidecarWithActor.socket ! x
   }
 
   def receive: Receive = {
-    case SidecarActor.Connected(out) ⇒ context.become(connected(out))
+    case SidecarActor.Connected(out) ⇒ become(connected(out))
   }
 }
 
