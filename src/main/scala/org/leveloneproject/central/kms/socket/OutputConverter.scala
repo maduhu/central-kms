@@ -1,11 +1,11 @@
 package org.leveloneproject.central.kms.socket
 
 import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import org.json4s.native.Serialization._
 import org.leveloneproject.central.kms.domain._
-import org.leveloneproject.central.kms.sidecar.SideCarCommandConverter
+import org.leveloneproject.central.kms.routing.JsonSupport
+import org.leveloneproject.central.kms.sidecar.SidecarMessageConverter
 
-trait OutputConverter extends SideCarCommandConverter {
+trait OutputConverter extends SidecarMessageConverter with JsonSupport {
   def toMessage(value: Any): Option[Message] = {
     def toOutput(value: Any): Option[Output] = {
       value match {

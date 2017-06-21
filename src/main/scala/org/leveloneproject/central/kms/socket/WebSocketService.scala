@@ -6,11 +6,9 @@ import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import com.google.inject.Inject
-import org.leveloneproject.central.kms.domain.batches.BatchService
-import org.leveloneproject.central.kms.domain.sidecars.SidecarService
-import org.leveloneproject.central.kms.sidecar.SidecarActor
+import org.leveloneproject.central.kms.sidecar.{SidecarActor, SidecarSupport}
 
-class WebSocketService @Inject()(batchService: BatchService, sidecarService: SidecarService)
+class WebSocketService @Inject()(sidecarSupport: SidecarSupport)
                                 (implicit val system: ActorSystem, implicit val materializer: ActorMaterializer) extends InputConverter with OutputConverter {
 
   private def commandExecutionFlow(sidecarActor: ActorRef): Flow[Any, Any, NotUsed] = {
@@ -23,7 +21,7 @@ class WebSocketService @Inject()(batchService: BatchService, sidecarService: Sid
   }
 
   def sidecarFlow(): Flow[Message, Message, NotUsed] = {
-    val sidecarActor = system.actorOf(SidecarActor.props(batchService, sidecarService))
+    val sidecarActor = system.actorOf(SidecarActor.props(sidecarSupport))
 
     Flow[Message]
       .map(fromMessage)

@@ -9,15 +9,15 @@ import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.domain.batches._
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheck, HealthCheckLevel, HealthCheckStatus}
 import org.leveloneproject.central.kms.domain.keys._
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterRequest, RegisterResponse, Sidecar, SidecarService}
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar}
 import org.leveloneproject.central.kms.sidecar.batch._
 import org.leveloneproject.central.kms.sidecar.healthcheck.HealthCheckRequest
 import org.leveloneproject.central.kms.sidecar.registration._
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
-import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -27,9 +27,8 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   trait Setup {
     val out = TestProbe()
     val outRef: ActorRef = out.ref
-    val sidecarService: SidecarService = mock[SidecarService]
-    val batchService: BatchService = mock[BatchService]
-    val sidecarActor = TestActorRef(SidecarActor.props(batchService, sidecarService))
+    val sidecarSupport: SidecarSupport = mock[SidecarSupport]
+    val sidecarActor = TestActorRef(SidecarActor.props(sidecarSupport))
     val defaultTimeout: FiniteDuration = 100.milliseconds
 
     final val serviceName = "service name"
@@ -41,7 +40,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     def setupRegistration(): Sidecar = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey)
       val sidecar = Sidecar(sidecarId, serviceName, Instant.now())
-      when(sidecarService.register(RegisterRequest(sidecarId, serviceName, sidecarActor))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName), sidecarActor)).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
       sidecar
     }
 
@@ -80,7 +79,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
   it should "send error to out when sidecar service throws error" in new Setup {
     val error = Error(500, "some message")
-    when(sidecarService.register(RegisterRequest(sidecarId, serviceName, sidecarActor))).thenReturn(Future.successful(Left(error)))
+    when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName), sidecarActor)).thenReturn(Future.successful(Left(error)))
     connectAndRegisterSidecar()
 
     out.expectMsg(ErrorWithCommandId(error, commandId))
@@ -103,7 +102,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
   it should "send duplicate sidecar registered error to out" in new Setup {
     private val exists = Errors.SidecarExistsError(sidecarId)
-    when(sidecarService.register(any())).thenReturn(Future.successful(Left(exists)))
+    when(sidecarSupport.registerSidecar(any(), any())).thenReturn(Future.successful(Left(exists)))
     connectAndRegisterSidecar()
     out.expectMsg(ErrorWithCommandId(exists, commandId))
   }
@@ -116,7 +115,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     private val batchId = UUID.randomUUID()
     private val signature = "signature"
 
-    when(batchService.create(CreateBatchRequest(sidecarId, batchId, signature)))
+    when(sidecarSupport.createBatch(sidecarId, BatchParameters(batchId, signature)))
       .thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
 
     sidecarActor ! BatchCommand(commandId, BatchParameters(batchId, signature))
@@ -138,11 +137,11 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   }
 
   it should "terminate sidecar and stop self when disconnected" in new Setup {
-    val sidecar = setupRegistration()
+    private val sidecar = setupRegistration()
     connectAndRegisterSidecar()
     out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
 
-    when(sidecarService.terminate(sidecar)).thenReturn(Future.successful(sidecar))
+    when(sidecarSupport.terminateSidecar(sidecar)).thenReturn(Future.successful(sidecar))
 
     sidecarActor ! SidecarActor.Disconnect
     sidecarActor.underlying.isTerminated shouldBe true

@@ -5,6 +5,8 @@ import java.util.UUID
 import org.leveloneproject.central.kms.sidecar.SideCarCommand
 
 object Errors {
+  val HealthCheckDoesNotExist = Error(121, "Health check does not exist")
+
   def SidecarExistsError(id: UUID) = Error(110, "Sidecar with id '%s' already exists".format(id))
   def BatchExistsError(id: UUID) = Error(120, "Batch with id '%s' already exists".format(id))
   val InternalError = Error(-32603, "Internal error")

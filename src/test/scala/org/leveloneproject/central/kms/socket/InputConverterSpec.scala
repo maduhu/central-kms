@@ -4,7 +4,9 @@ import java.util.UUID
 
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import akka.util.ByteString
+import org.json4s.JsonAST.JObject
 import org.leveloneproject.central.kms.domain.Errors._
+import org.leveloneproject.central.kms.sidecar.CompleteRequest
 import org.leveloneproject.central.kms.sidecar.batch.{BatchCommand, BatchParameters}
 import org.leveloneproject.central.kms.sidecar.registration.{RegisterCommand, RegisterParameters}
 import org.leveloneproject.central.kms.utils.MessageBuilder
@@ -83,5 +85,12 @@ class InputConverterSpec extends FlatSpec with Matchers with MessageBuilder {
     val message = TextMessage.Strict(batchRequest(requestId, batchId, signature))
 
     converter.fromMessage(message) shouldBe BatchCommand(requestId, BatchParameters(batchId, signature))
+  }
+
+  it should "convert command response to CompleteRequest" in new Setup {
+    private val commandId = UUID.randomUUID()
+    val message = TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"result\":{},\"id\":\"%s\"}".format(commandId))
+
+    converter.fromMessage(message) shouldBe CompleteRequest(commandId.toString, Some(JObject(List())), None)
   }
 }

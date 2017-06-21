@@ -10,6 +10,6 @@ import scala.language.implicitConversions
 case class RegisterParameters(id: UUID, serviceName: String)
 
 object RegisterParameters {
-  implicit def toRegisterRequest(params: RegisterParameters)(implicit actor: ActorRef): RegisterRequest =
+  implicit def toRegisterRequest(params: RegisterParameters, actor: ActorRef): RegisterRequest =
     RegisterRequest(params.id, params.serviceName, actor)
 }

@@ -1,6 +1,7 @@
 package org.leveloneproject.central.kms.domain.healthchecks
 
 import java.time.Clock
+import java.util.UUID
 
 import com.google.inject.Inject
 import org.leveloneproject.central.kms.domain._
@@ -24,6 +25,13 @@ class HealthCheckService @Inject()(
         sidecar ! healthCheck
         Right(healthCheck)
       }
+    }
+  }
+
+  def complete(healthCheckId: UUID, response: String): Future[Either[Error, HealthCheck]] = {
+    healthCheckRepository.complete(healthCheckId, response, clock.instant()).map {
+      case None ⇒ Left(Errors.HealthCheckDoesNotExist)
+      case Some(x) ⇒ Right(x)
     }
   }
 }
