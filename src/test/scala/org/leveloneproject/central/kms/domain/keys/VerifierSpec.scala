@@ -4,7 +4,7 @@ import java.security.{KeyPair, PublicKey}
 
 import net.i2p.crypto.eddsa.{EdDSAEngine, KeyPairGenerator}
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.util.Bytes
+import org.leveloneproject.central.kms.util.Bytes.Hex
 import org.scalatest.FlatSpec
 import org.scalatest.mockito.MockitoSugar
 
@@ -16,7 +16,7 @@ class VerifierSpec extends FlatSpec with MockitoSugar with AwaitResult {
     engine.initSign(keyPair.getPrivate)
     val message = "message"
     engine.update(message.getBytes())
-    val signature: String = Bytes.toHex(engine.sign())
+    val signature: String = engine.sign().toHex
     val publicKey: PublicKey = keyPair.getPublic
     val verifier = new Verifier()
   }

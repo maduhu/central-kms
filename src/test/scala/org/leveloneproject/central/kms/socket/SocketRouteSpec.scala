@@ -27,9 +27,10 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     final val serviceName: String = "some service"
     final val publicKey: String = "public key"
     final val privateKey: String = "batch key"
+    final val rowKey: String = "row key"
 
     def setupRegistration(): Unit = {
-      val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey)
+      val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, rowKey)
       val sidecar = Sidecar(sidecarId, serviceName, Instant.now())
       when(sidecarSupport.registerSidecar(any(), any())).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
     }
@@ -60,7 +61,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest(requestId, sidecarId, serviceName))
-      wsClient.expectMessage(registerResponse(requestId, sidecarId, privateKey))
+      wsClient.expectMessage(registerResponse(requestId, sidecarId, privateKey, rowKey))
     }
   }
 
@@ -70,7 +71,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest("test", sidecarId, serviceName))
-      wsClient.expectMessage(registerResponse("test", sidecarId, privateKey))
+      wsClient.expectMessage(registerResponse("test", sidecarId, privateKey, rowKey))
       wsClient.sendMessage(registerRequest("test2"))
       wsClient.expectMessage("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%s,\"message\":\"%s\"},\"id\":\"test2\"}".format(100, "'register' method not allowed in current state"))
     }
@@ -85,11 +86,9 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest("register1", sidecarId, serviceName))
-      wsClient.expectMessage(registerResponse("register1", sidecarId, privateKey))
+      wsClient.expectMessage(registerResponse("register1", sidecarId, privateKey, rowKey))
       wsClient.sendMessage(batchRequest("batch1", batchId, signature))
       wsClient.expectMessage(batchResponse("batch1", batchId))
     }
   }
 }
-
-case class MockHealthCheckResponse(a: String, b: String)

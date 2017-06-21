@@ -36,9 +36,10 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     final val commandId = "commandId"
     final val publicKey = "some public key"
     final val privateKey = "some private key"
+    final val symmetricKey = "symmetric key";
 
     def setupRegistration(): Sidecar = {
-      val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey)
+      val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, symmetricKey)
       val sidecar = Sidecar(sidecarId, serviceName, Instant.now())
       when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName), sidecarActor)).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
       sidecar
@@ -88,14 +89,14 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   it should "send registered to out when registering" in new Setup {
     setupRegistration()
     connectAndRegisterSidecar()
-    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey)))
   }
 
   it should "send method not allowed to out when registering twice" in new Setup {
     setupRegistration()
 
     connectAndRegisterSidecar()
-    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey)))
     registerSidecar()
     out.expectMsg(ErrorWithCommandId(Error(100, "'register' method not allowed in current state"), commandId))
   }
@@ -110,7 +111,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   it should "save batch when registered and send batch to out" in new Setup {
     setupRegistration()
     connectAndRegisterSidecar()
-    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey)))
 
     private val batchId = UUID.randomUUID()
     private val signature = "signature"
@@ -125,7 +126,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   it should "send healthcheck request to websocket" in new Setup {
     setupRegistration()
     connectAndRegisterSidecar()
-    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey)))
 
     private val healthCheckId = UUID.randomUUID()
     private val healthCheckLevel = HealthCheckLevel.Ping
@@ -139,7 +140,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   it should "terminate sidecar and stop self when disconnected" in new Setup {
     private val sidecar = setupRegistration()
     connectAndRegisterSidecar()
-    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, "")))
+    out.expectMsg(Registered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey)))
 
     when(sidecarSupport.terminateSidecar(sidecar)).thenReturn(Future.successful(sidecar))
 

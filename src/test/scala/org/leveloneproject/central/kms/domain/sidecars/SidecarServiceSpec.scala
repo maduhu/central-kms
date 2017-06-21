@@ -52,7 +52,7 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
   it should "return register result if sidecar and keys are saved" in new Setup {
     private val sidecar = Sidecar(sidecarId, serviceName, now)
     when(sidecarRepository.save(sidecar)).thenReturn(Future.successful(Right(sidecar)))
-    private val keyResponse = CreateKeyResponse(UUID.randomUUID(), "public key", "private key")
+    private val keyResponse = CreateKeyResponse(UUID.randomUUID(), "public key", "private key", "symmetric key")
     when(keyService.create(CreateKeyRequest(sidecarId))).thenReturn(Future.successful(Right(keyResponse)))
 
     await(sidecarService.register(registerRequest)) shouldBe Right(RegisterResponse(sidecar, keyResponse))
@@ -61,7 +61,7 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
   it should "add sidecar to sidecarList" in new Setup {
     private val sidecar = Sidecar(sidecarId, serviceName, now)
     when(sidecarRepository.save(sidecar)).thenReturn(Future.successful(Right(sidecar)))
-    private val keyResponse = CreateKeyResponse(UUID.randomUUID(), "public key", "private key")
+    private val keyResponse = CreateKeyResponse(UUID.randomUUID(), "public key", "private key", "symmetric key")
     when(keyService.create(CreateKeyRequest(sidecarId))).thenReturn(Future.successful(Right(keyResponse)))
 
     await(sidecarService.register(registerRequest))

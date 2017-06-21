@@ -9,13 +9,13 @@ import org.mockito.Mockito._
 import org.scalatest.FlatSpec
 import org.scalatest.mockito.MockitoSugar
 
-class KeyGeneratorSpec extends FlatSpec with MockitoSugar with AwaitResult {
+class AsymmetricKeyGeneratorSpec extends FlatSpec with MockitoSugar with AwaitResult {
   private val privateKeyString = "00112233445566778899"
   private val publicKeyString = "AABBCCDDEEFF"
 
   trait Setup {
     val keyPairGenerator: KeyPairGeneratorSpi = mock[KeyPairGeneratorSpi]
-    val keyGenerator = new KeyGenerator(keyPairGenerator)
+    val keyGenerator = new AsymmetricKeyGenerator(keyPairGenerator)
   }
 
   "generate" should "generate pair" in new Setup {
@@ -32,7 +32,7 @@ class KeyGeneratorSpec extends FlatSpec with MockitoSugar with AwaitResult {
   }
 
   it should "generate different keys on successive calls" in new Setup {
-    val keyGen = new KeyGenerator(new KeyPairGenerator)
+    val keyGen = new AsymmetricKeyGenerator(new KeyPairGenerator)
 
     val result1: PublicPrivateKeyPair = await(keyGen.generate())
     val result2: PublicPrivateKeyPair = await(keyGen.generate())

@@ -26,7 +26,7 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSuppor
         val sidecar = r.sidecar
         val keyResponse = r.keyResponse
         become(registered(SidecarWithOutSocket(sidecar, out)))
-        out ! Registered(id, RegisteredResult(sidecar.id, keyResponse.privateKey, ""))
+        out ! Registered(id, RegisteredResult(sidecar.id, keyResponse.privateKey, keyResponse.symmetricKey))
       } recover {
         case x: Error ⇒ out ! ErrorWithCommandId(x, id)
       }

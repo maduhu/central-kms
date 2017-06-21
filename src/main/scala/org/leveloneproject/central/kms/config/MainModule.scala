@@ -13,7 +13,7 @@ import net.i2p.crypto.eddsa.KeyPairGenerator
 import org.flywaydb.core.Flyway
 import org.leveloneproject.central.kms.Service
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckRouter
-import org.leveloneproject.central.kms.domain.keys.KeyGenerator
+import org.leveloneproject.central.kms.domain.keys.AsymmetricKeyGenerator
 import org.leveloneproject.central.kms.domain.sidecars.{SidecarList, SidecarRouter}
 import org.leveloneproject.central.kms.persistance._
 import org.leveloneproject.central.kms.persistance.postgres._
@@ -38,7 +38,7 @@ class MainModule(config: Config) extends ScalaModule {
     bind[Flyway]
     bind[Migrator]
     bind[Service]
-    bind[KeyGenerator]
+    bind[AsymmetricKeyGenerator]
     bind[RouteAggregator]
     bind[WebSocketService]
 

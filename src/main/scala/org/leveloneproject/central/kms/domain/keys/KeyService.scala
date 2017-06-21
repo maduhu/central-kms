@@ -8,13 +8,18 @@ import org.leveloneproject.central.kms.util.FutureEither
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class KeyService @Inject()(keyGenerator: KeyGenerator, keyStore: KeyStore, verifier: Verifier) {
+class KeyService @Inject()(
+  asymmetricKeyGenerator: AsymmetricKeyGenerator,
+  symmetricKeyGenerator: SymmetricKeyGenerator,
+  keyStore: KeyStore,
+  verifier: Verifier) {
   def create(keyRequest: CreateKeyRequest): Future[Either[Error, CreateKeyResponse]] = {
 
     for {
-      keyPair ← keyGenerator.generate()
+      keyPair ← asymmetricKeyGenerator.generate()
+      symmetricKey ← symmetricKeyGenerator.generate()
       key ← FutureEither(keyStore.create(Key(keyRequest.id, keyPair.publicKey)))
-    } yield CreateKeyResponse(key.id, keyPair.publicKey, keyPair.privateKey)
+    } yield CreateKeyResponse(key.id, keyPair.publicKey, keyPair.privateKey, symmetricKey)
   }
 
   def validate(validateRequest: ValidateRequest): Future[Either[ValidateError, ValidateResponse]] = {
