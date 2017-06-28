@@ -54,7 +54,7 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
   }
 
   it should "return createError from keystore" in new Setup {
-    private val error = Error(500, "any message")
+    private val error = KmsError(500, "any message")
     setupKeys()
     when(store.create(any())).thenReturn(Future(Left(error)))
 

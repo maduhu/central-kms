@@ -5,10 +5,10 @@ import java.time.{Clock, Instant}
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.Errors
+import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.persistance.BatchRepository
-import org.mockito.Mockito._
 import org.mockito.ArgumentMatchers._
+import org.mockito.Mockito._
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -18,11 +18,11 @@ class BatchServiceSpec extends FlatSpec with Matchers with MockitoSugar with Awa
 
   trait Setup {
     val repo: BatchRepository = mock[BatchRepository]
-    val clock = mock[Clock]
+    val clock: Clock = mock[Clock]
     val service = new BatchService(repo, clock)
     val sidecarId: UUID = UUID.randomUUID()
     val batchId: UUID = UUID.randomUUID()
-    val now = Instant.now()
+    val now: Instant = Instant.now()
     when(clock.instant()).thenReturn(now)
   }
 
@@ -42,15 +42,15 @@ class BatchServiceSpec extends FlatSpec with Matchers with MockitoSugar with Awa
 
     when(repo.insert(any())).thenReturn(Future.failed(ex))
 
-    await(service.create(CreateBatchRequest(sidecarId, batchId, "signature"))) shouldBe Left(Errors.BatchExistsError(batchId))
+    await(service.create(CreateBatchRequest(sidecarId, batchId, "signature"))) shouldBe Left(KmsError.batchExistsError(batchId))
   }
 
-  it should "return InernalError if exception is thrown by repo" in new Setup {
+  it should "return InternalError if exception is thrown by repo" in new Setup {
     private val ex = mock[Exception]
 
     when(repo.insert(any())).thenReturn(Future.failed(ex))
 
-    await(service.create(CreateBatchRequest(sidecarId, batchId, "signature"))) shouldBe Left(Errors.InternalError)
+    await(service.create(CreateBatchRequest(sidecarId, batchId, "signature"))) shouldBe Left(KmsError.internalError)
   }
 
 

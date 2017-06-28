@@ -12,7 +12,7 @@ class SymmetricKeyGenerator {
 
   def generate(): Future[String] = Future {
     val generator = KeyGenerator.getInstance(algorithm)
-    generator.init(256)
+    generator.init(keySize)
     generator.generateKey().getEncoded.toHex
   }
 }

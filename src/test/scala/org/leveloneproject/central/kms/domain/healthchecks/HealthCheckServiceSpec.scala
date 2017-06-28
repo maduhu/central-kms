@@ -5,7 +5,7 @@ import java.util.UUID
 
 import akka.testkit.TestProbe
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.Errors
+import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckLevel.Ping
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckStatus.Pending
 import org.leveloneproject.central.kms.domain.sidecars.SidecarList
@@ -39,7 +39,7 @@ class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with M
   "create" should "create, save and return new HealthCheck" in new Setup {
     val request = CreateHealthCheckRequest(sidecarId, Ping)
 
-    private val check = HealthCheck(healthCheckId, sidecarId, Ping, now, Pending, None, None)
+    private val check = HealthCheck(healthCheckId, sidecarId, Ping, now, Pending)
 
     private val sidecarProbe = TestProbe()
     when(sidecarList.actorById(sidecarId)).thenReturn(Future.successful(Right(sidecarProbe.ref)))
@@ -54,7 +54,7 @@ class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with M
   it should "return error if sidecar not found" in new Setup {
     val request = CreateHealthCheckRequest(sidecarId, Ping)
 
-    private val error = Errors.UnregisteredSidecar(sidecarId)
+    private val error = KmsError.unregisteredSidecar(sidecarId)
     when(sidecarList.actorById(sidecarId)).thenReturn(Future.successful(Left(error)))
 
     await(service.create(request)) shouldBe Left(error)

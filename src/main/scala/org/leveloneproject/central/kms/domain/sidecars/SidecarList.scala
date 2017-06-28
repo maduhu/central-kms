@@ -6,10 +6,9 @@ import akka.actor.ActorRef
 import org.leveloneproject.central.kms.domain._
 
 import scala.collection.mutable
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
-
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class SidecarList {
 
@@ -17,17 +16,15 @@ class SidecarList {
 
   def current(): Future[Seq[Sidecar]] = Future.successful(sidecars.values.map(_.sidecar).toSeq)
 
-  def register(sidecar: Sidecar, actor: ActorRef): Unit = sidecars += (sidecar.id → SidecarWithActor(sidecar, actor))
+  def register(sidecarWithActor: SidecarWithActor): Unit = sidecars += (sidecarWithActor.sidecar.id → sidecarWithActor)
 
   def unregister(id: UUID): Unit = sidecars -= id
 
-  def actorById(id: UUID): Future[Either[Error, ActorRef]] = Future {
+  def actorById(id: UUID): Future[Either[KmsError, ActorRef]] = Future {
     Try(sidecars(id)) match {
       case Success(a) ⇒ Right(a.actor)
-      case Failure(_) ⇒ Left(Errors.UnregisteredSidecar(id))
+      case Failure(_) ⇒ Left(KmsError.unregisteredSidecar(id))
     }
   }
 
 }
-
-case class SidecarWithActor(sidecar: Sidecar, actor: ActorRef)

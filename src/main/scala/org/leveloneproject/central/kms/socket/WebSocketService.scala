@@ -6,16 +6,16 @@ import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import com.google.inject.Inject
-import org.leveloneproject.central.kms.sidecar.{SidecarActor, SidecarSupport}
+import org.leveloneproject.central.kms.sidecar._
 
 class WebSocketService @Inject()(sidecarSupport: SidecarSupport)
                                 (implicit val system: ActorSystem, implicit val materializer: ActorMaterializer) extends InputConverter with OutputConverter {
 
-  private def commandExecutionFlow(sidecarActor: ActorRef): Flow[Any, Any, NotUsed] = {
-    val inputFlow = Flow[Any].to(Sink.actorRef(sidecarActor, SidecarActor.Disconnect))
+  private def commandExecutionFlow(sidecarActor: ActorRef): Flow[AnyRef, AnyRef, NotUsed] = {
+    val inputFlow = Flow[AnyRef].to(Sink.actorRef(sidecarActor, Disconnect))
 
-    val outputFlow = Source.actorRef[Any](100, OverflowStrategy.dropTail)
-      .mapMaterializedValue(sidecarActor ! SidecarActor.Connected(_))
+    val outputFlow = Source.actorRef[AnyRef](100, OverflowStrategy.dropTail)
+      .mapMaterializedValue(sidecarActor ! Connected(_))
 
     Flow.fromSinkAndSource(inputFlow, outputFlow)
   }

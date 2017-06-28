@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.implicitConversions
 
-class FutureEither[L, R](private val future: Future[Either[L, R]]) {
+class FutureEither[L, R](val future: Future[Either[L, R]]) {
   def flatMap[R2](block: R ⇒ FutureEither[L, R2]): FutureEither[L, R2] = {
     val result = future.flatMap {
       case Right(r) ⇒ block(r).future
@@ -27,8 +27,6 @@ class FutureEither[L, R](private val future: Future[Either[L, R]]) {
       case Left(l) ⇒ block(l)
     }
   }
-
-  def toFuture(): Future[Either[L, R]] = future
 }
 
 object FutureEither {

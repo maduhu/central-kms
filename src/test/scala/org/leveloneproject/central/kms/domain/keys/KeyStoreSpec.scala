@@ -3,7 +3,7 @@ package org.leveloneproject.central.kms.domain.keys
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.Errors
+import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.persistance.{KeyRepository, KeyStore}
 import org.mockito.Mockito._
 import org.postgresql.util.PSQLException
@@ -15,8 +15,8 @@ import scala.concurrent.Future
 class KeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitResult {
 
   trait Setup {
-    val keysRepo: KeyRepository = mock[KeyRepository]
-    val keyStore = new KeyStore(keysRepo)
+    final val keysRepo: KeyRepository = mock[KeyRepository]
+    final val keyStore = new KeyStore(keysRepo)
   }
 
   "create" should "return DuplicateKey error when PrimaryKeyViolation thrown" in new Setup {
@@ -26,7 +26,7 @@ class KeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitRe
     val key = Key(keyId, "public key")
     when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
 
-    await(keyStore.create(key)) shouldBe Left(Errors.SidecarExistsError(keyId))
+    await(keyStore.create(key)) shouldBe Left(KmsError.sidecarExistsError(keyId))
   }
 
   it should "return InternalError on exception" in new Setup {
@@ -35,6 +35,6 @@ class KeyStoreSpec extends FlatSpec with Matchers with MockitoSugar with AwaitRe
     val key = Key(keyId, "public key")
     when(keysRepo.insert(key)).thenReturn(Future.failed(exception))
 
-    await(keyStore.create(key)) shouldBe Left(Errors.InternalError)
+    await(keyStore.create(key)) shouldBe Left(KmsError.internalError)
   }
 }

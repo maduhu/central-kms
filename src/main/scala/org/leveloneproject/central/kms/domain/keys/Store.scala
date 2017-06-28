@@ -7,7 +7,7 @@ import scala.concurrent.Future
 
 trait Store {
 
-  def create(key: Key): Future[Either[Error, Key]]
+  def create(key: Key): Future[Either[KmsError, Key]]
 
   def getById(id: UUID): Future[Option[Key]]
 }

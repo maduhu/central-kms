@@ -13,4 +13,5 @@ object HealthCheckStatus {
   }
 
   case object Pending extends HealthCheckStatus(1, "pending")
+
 }

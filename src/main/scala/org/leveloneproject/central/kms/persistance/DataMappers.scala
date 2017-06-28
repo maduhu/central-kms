@@ -4,6 +4,7 @@ import java.sql.Timestamp
 import java.time.Instant
 
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheckLevel, HealthCheckStatus}
+import org.leveloneproject.central.kms.domain.sidecars.SidecarStatus
 import slick.ast.BaseTypedType
 import slick.jdbc.JdbcType
 
@@ -22,8 +23,13 @@ trait DataMappers {
     s ⇒ HealthCheckLevel(s)
   )
 
-  implicit val healthCheckStatusMapper = MappedColumnType.base[HealthCheckStatus, Int](
+  implicit val healthCheckStatusMapper: JdbcType[HealthCheckStatus] with BaseTypedType[HealthCheckStatus] = MappedColumnType.base[HealthCheckStatus, Int](
     status ⇒ status.id,
     status ⇒ HealthCheckStatus(status)
+  )
+
+  implicit val sidecarStatusMapper: JdbcType[SidecarStatus] with BaseTypedType[SidecarStatus] = MappedColumnType.base[SidecarStatus, Int](
+    status ⇒ status.id,
+    status ⇒ SidecarStatus(status)
   )
 }

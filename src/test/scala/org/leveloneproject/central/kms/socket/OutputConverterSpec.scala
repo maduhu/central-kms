@@ -1,45 +1,36 @@
 package org.leveloneproject.central.kms.socket
 
+import java.util.UUID
+
 import akka.http.scaladsl.model.ws.TextMessage
 import org.leveloneproject.central.kms.domain._
+import org.leveloneproject.central.kms.sidecar.Responses
 import org.scalatest.{FlatSpec, Matchers}
 
-class OutputConverterSpec extends FlatSpec with Matchers {
+class OutputConverterSpec extends FlatSpec with Matchers with OutputConverter {
 
-  trait Setup {
-    val converter = new OutputConverter {}
+  "toMessage" should "convert input error to rpc error response" in {
+    val error = KmsError(14, "some message")
+
+    toMessage(error) shouldBe Some(TextMessage.Strict("""{"jsonrpc":"2.0","error":{"code":14,"message":"some message"},"id":null}"""))
   }
 
-  "toMessage" should "convert input error to rpc error response" in new Setup {
-    val error = Error(14, "some message")
+  it should "convert JsonResponse to Some JsonResponse" in {
+    val response = JsonResponse("2.0", None, Some(KmsError(100, "some message")), "commandId")
 
-    converter.toMessage(error) shouldBe Some(TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":14,\"message\":\"some message\"},\"id\":null}"))
+    toMessage(response) shouldBe Some(TextMessage.Strict("""{"jsonrpc":"2.0","error":{"code":100,"message":"some message"},"id":"commandId"}"""))
   }
 
-  it should "convert ErrorWithCommandId to rpc error response" in new Setup {
-    val error = ErrorWithCommandId(Error(100, "some message"), "commandid")
-
-    converter.toMessage(error) shouldBe Some(TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":100,\"message\":\"some message\"},\"id\":\"commandid\"}"))
+  it should "return None for other Types" in {
+    toMessage(SomeResponse(UUID.randomUUID(), 1000)) shouldBe None
+    toMessage("some string") shouldBe None
   }
 
-  it should "convert command response to rpc response" in new Setup {
-    val r = SomeResponse("some id", 100)
-    val response = CommandResponse(r, "commandid")
-
-    converter.toMessage(response) shouldBe Some(TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"result\":{\"id\":\"some id\",\"value\":100},\"id\":\"commandid\"}"))
-  }
-
-  it should "convert command request to rpc request" in new Setup {
-    val r = CommandRequest("some id", "method", SomeResponse("response id", 100))
-
-    converter.toMessage(r) shouldBe
-      Some(TextMessage.Strict("{\"jsonrpc\":\"2.0\",\"id\":\"some id\",\"method\":\"method\",\"params\":{\"id\":\"response id\",\"value\":100}}"))
-  }
-
-  it should "return None for other Types" in new Setup {
-    converter.toMessage(SomeResponse("fjdkfjdsl", 1000)) shouldBe None
-    converter.toMessage("some string") shouldBe None
+  it should "convert challengeAccepted to json response" in {
+    val commandId = UUID.randomUUID().toString
+    val response = Responses.challengeAccepted(commandId)
+    toMessage(response) shouldBe Some(TextMessage.Strict(s"""{"jsonrpc":"2.0","result":{"status":"OK"},"id":"$commandId"}"""))
   }
 }
 
-case class SomeResponse(id: String, value: Int)
+case class SomeResponse(id: UUID, value: Int)

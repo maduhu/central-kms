@@ -8,6 +8,6 @@ object Bytes {
   }
 
   implicit class Hex(buf: Array[Byte]) {
-    def toHex = buf.map("%02X" format _).mkString
+    def toHex: String = buf.map("%02X" format _).mkString
   }
 }

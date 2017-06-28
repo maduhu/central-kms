@@ -6,4 +6,4 @@ Central Key Management Service
 * `DB_HOST`: Network address or ip address of database server (default: `localhost`)
 * `DB_PORT`: Port of database server (default: `5432`)
 * `DB_USER`: User to connect to database (default: `kms`)
-* `DB_PASSWORD`: Passord of `kms` database user: (default: `kms`)
+* `DB_PASSWORD`: Password of `kms` database user: (default: `kms`)

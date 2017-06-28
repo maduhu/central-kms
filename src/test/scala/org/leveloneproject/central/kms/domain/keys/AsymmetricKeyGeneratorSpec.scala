@@ -11,6 +11,7 @@ import org.scalatest.mockito.MockitoSugar
 
 class AsymmetricKeyGeneratorSpec extends FlatSpec with MockitoSugar with AwaitResult {
   private val privateKeyString = "00112233445566778899"
+  //noinspection SpellCheckingInspection
   private val publicKeyString = "AABBCCDDEEFF"
 
   trait Setup {

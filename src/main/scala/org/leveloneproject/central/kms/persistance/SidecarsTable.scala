@@ -1,9 +1,9 @@
 package org.leveloneproject.central.kms.persistance
 
-import java.time.Instant
 import java.util.UUID
 
-import org.leveloneproject.central.kms.domain.sidecars.Sidecar
+import org.leveloneproject.central.kms.domain.sidecars.{Sidecar, SidecarStatus}
+import slick.lifted.ProvenShape
 
 trait SidecarsTable extends DataMappers {
   this: DbProfile ⇒
@@ -11,12 +11,12 @@ trait SidecarsTable extends DataMappers {
   import profile.api._
 
   class SidecarsTable(tag: Tag) extends Table[Sidecar](tag, "sidecars") {
-    def id = column[UUID]("id")
-    def serviceName = column[String]("service_name")
-    def registered = column[Instant]("registered")
-    def terminated = column[Option[Instant]]("terminated")
-    def * = (id, serviceName, registered, terminated) <> (Sidecar.tupled, Sidecar.unapply)
+    def id: Rep[UUID] = column[UUID]("id")
+    def serviceName: Rep[String] = column[String]("service_name")
+    def status: Rep[SidecarStatus] = column[SidecarStatus]("status")
+    def challenge: Rep[String] = column[String]("challenge")
+    def * : ProvenShape[Sidecar] = (id, serviceName, status, challenge) <> (Sidecar.tupled, Sidecar.unapply)
   }
 
-  val sidecars = TableQuery[SidecarsTable]
+  val sidecars: TableQuery[SidecarsTable] = TableQuery[SidecarsTable]
 }

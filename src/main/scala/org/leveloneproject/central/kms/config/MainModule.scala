@@ -52,6 +52,7 @@ class MainModule(config: Config) extends ScalaModule {
     bind[KeyRepository].to[PostgresKeyRepository]
     bind[SidecarRepository].to[PostgresSidecarRepository]
     bind[HealthCheckRepository].to[PostgresHealthCheckRepository]
+    bind[SidecarLogsRepository].to[PostgresSidecarLogsRepository]
   }
 
   private def bindRouters(): Unit = {

@@ -1,6 +1,7 @@
 package org.leveloneproject.central.kms
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import com.google.inject.Inject
 import org.leveloneproject.central.kms.persistance.Migrator
@@ -11,5 +12,5 @@ case class Service @Inject()(system: ActorSystem, materializer: ActorMaterialize
     migrator.migrate()
   }
 
-  def route = routeAggregator.route
+  def route: Route = routeAggregator.route
 }

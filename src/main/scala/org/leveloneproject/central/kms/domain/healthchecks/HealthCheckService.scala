@@ -18,9 +18,9 @@ class HealthCheckService @Inject()(
                                     clock: Clock,
                                     sidecarList: SidecarList) extends IdGenerator {
 
-  def create(request: CreateHealthCheckRequest): Future[Either[Error, HealthCheck]] = {
+  def create(request: CreateHealthCheckRequest): Future[Either[KmsError, HealthCheck]] = {
     FutureEither(sidecarList.actorById(request.sidecarId)) flatMap { sidecar ⇒
-      val healthCheck = HealthCheck(newId(), request.sidecarId, request.level, clock.instant(), Pending, None, None)
+      val healthCheck = HealthCheck(newId(), request.sidecarId, request.level, clock.instant(), Pending)
       healthCheckRepository.insert(healthCheck) map { _ ⇒
         sidecar ! healthCheck
         Right(healthCheck)
@@ -28,9 +28,9 @@ class HealthCheckService @Inject()(
     }
   }
 
-  def complete(healthCheckId: UUID, response: String): Future[Either[Error, HealthCheck]] = {
+  def complete(healthCheckId: UUID, response: String): Future[Either[KmsError, HealthCheck]] = {
     healthCheckRepository.complete(healthCheckId, response, clock.instant()).map {
-      case None ⇒ Left(Errors.HealthCheckDoesNotExist)
+      case None ⇒ Left(KmsError.healthCheckDoesNotExist)
       case Some(x) ⇒ Right(x)
     }
   }

@@ -6,7 +6,9 @@ object HealthCheckLevel {
   def apply(id: Int): HealthCheckLevel = id match {
     case 1 ⇒ Ping
   }
+
   case object Ping extends HealthCheckLevel(1, "ping")
+
 }
 
 

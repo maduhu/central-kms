@@ -3,54 +3,61 @@ package org.leveloneproject.central.kms.sidecar
 import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Props}
-import org.json4s.JsonAST.JValue
-import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
-import org.leveloneproject.central.kms.domain.sidecars.Sidecar
-import org.leveloneproject.central.kms.routing.JsonSupport
-import org.leveloneproject.central.kms.sidecar.SidecarActor.SidecarWithOutSocket
-import org.leveloneproject.central.kms.sidecar.batch._
-import org.leveloneproject.central.kms.sidecar.healthcheck.HealthCheckRequest
-import org.leveloneproject.central.kms.sidecar.registration._
-import org.leveloneproject.central.kms.util.FutureEither
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, SidecarWithActor}
+import org.leveloneproject.central.kms.socket.{JsonRequest, JsonResponse}
+import org.leveloneproject.central.kms.util.JsonSerializer
 
-class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSupport {
+import scala.language.implicitConversions
 
+class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerializer {
+
+  import Responses._
   import context._
 
-  val requests = collection.mutable.HashMap.empty[String, (String, JValue) ⇒ Unit]
+  val requests = collection.mutable.HashMap.empty[String, (String, AnyRef) ⇒ Unit]
 
   def connected(out: ActorRef): Receive = {
-    case RegisterCommand(id, registerParameters) ⇒
-      FutureEither(sidecarSupport.registerSidecar(registerParameters, self)) map { r ⇒
-        val sidecar = r.sidecar
-        val keyResponse = r.keyResponse
-        become(registered(SidecarWithOutSocket(sidecar, out)))
-        out ! Registered(id, RegisteredResult(sidecar.id, keyResponse.privateKey, keyResponse.symmetricKey))
-      } recover {
-        case x: Error ⇒ out ! ErrorWithCommandId(x, id)
+    case Register(id, registerParameters) ⇒
+      sidecarSupport.registerSidecar(registerParameters, self) map {
+        case Right(response) ⇒
+          become(challenged(SidecarWithActor(response.sidecar, out)))
+          out ! sidecarRegistered(id, response)
+        case Left(error) ⇒ out ! commandError(id, error)
       }
-    case x: SideCarCommand ⇒ out ! Errors.MethodNotAllowedInCurrentState(x)
-    case SidecarActor.Disconnect ⇒ terminate()
+    case command: Command ⇒ out ! methodNotAllowed(command)
+    case Disconnect ⇒ terminate()
     case x ⇒ out ! x
   }
 
-  def registered(sidecarWithActor: SidecarWithOutSocket): Receive = {
-    case r: CompleteRequest ⇒ handleRequest(r)
-    case BatchCommand(id, batchParameters) ⇒
-      sidecarSupport.createBatch(sidecarWithActor.sidecarId, batchParameters).map {
-        _.fold(e ⇒ ErrorWithCommandId(e, id), batch ⇒ BatchCreated(id, BatchCreatedResult(batch.id)))
-      }.map { result ⇒ sidecarWithActor.socket ! result }
-    case HealthCheck(id, _, level, _, _, _, _) ⇒
-      requests += id.toString → completeHealthCheck
-      sidecarWithActor.socket ! HealthCheckRequest(id, level)
-    case x: SideCarCommand ⇒ sidecarWithActor.socket ! Errors.MethodNotAllowedInCurrentState(x)
-    case SidecarActor.Disconnect ⇒ sidecarSupport.terminateSidecar(sidecarWithActor.sidecar) map { _ ⇒ terminate() }
-    case x ⇒ sidecarWithActor.socket ! x
+  def challenged(sidecarWithActor: SidecarWithActor): Receive = {
+    case Challenge(id, params) ⇒
+      become(registered(sidecarWithActor))
+      sidecarWithActor.actor ! challengeAccepted(id)
+    case command: Command ⇒ sidecarWithActor.actor ! methodNotAllowed(command)
+    case Disconnect ⇒ terminate()
+    case x ⇒ sidecarWithActor.actor ! x
+  }
+
+  def registered(sidecarWithActor: SidecarWithActor): Receive = {
+    case CompleteRequest(jsonResponse) ⇒ handleRequest(jsonResponse)
+    case SaveBatch(id, params) ⇒
+      sidecarSupport.createBatch(sidecarWithActor.sidecar.id, params).map {
+        _.fold(e ⇒ commandError(id, e), batch ⇒ batchCreated(id, batch))
+      }.map { result ⇒ sidecarWithActor.actor ! result }
+    case healthCheck: HealthCheck ⇒ request(sidecarWithActor.actor, healthCheckRequest(healthCheck), completeHealthCheck)
+    case command: Command ⇒ sidecarWithActor.actor ! methodNotAllowed(command)
+    case Disconnect ⇒ sidecarSupport.terminateSidecar(sidecarWithActor.sidecar) map { _ ⇒ terminate() }
+    case x ⇒ sidecarWithActor.actor ! x
   }
 
   def receive: Receive = {
-    case SidecarActor.Connected(out) ⇒ become(connected(out))
+    case Connected(socket) ⇒ become(connected(socket))
+  }
+
+  private def request(out: ActorRef, request: JsonRequest, handler: (String, AnyRef) ⇒ Unit) = {
+    requests += request.id → handler
+    out ! request
   }
 
   private def terminate(): Unit = {
@@ -58,8 +65,8 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSuppor
     stop(self)
   }
 
-  private def handleRequest(request: CompleteRequest): Unit = {
-    requests.remove(request.id).foreach((req: (String, JValue) ⇒ Unit) ⇒ {
+  private def handleRequest(request: JsonResponse): Unit = {
+    requests.remove(request.id).foreach((req: (String, AnyRef) ⇒ Unit) ⇒ {
       (request.result, request.error) match {
         case (Some(result), _) ⇒ req(request.id, result)
         case _ ⇒ //ignore
@@ -67,20 +74,14 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSuppor
     })
   }
 
-  private def completeHealthCheck(healthCheckId: String, result: JValue): Unit = {
-    sidecarSupport.completeHealthCheck(UUID.fromString(healthCheckId), write(result))
+  private def completeHealthCheck(healthCheckId: String, result: AnyRef): Unit = {
+    sidecarSupport.completeHealthCheck(UUID.fromString(healthCheckId), serialize(result))
   }
+
+  private implicit def toRegisteredResult(response: RegisterResponse): RegisteredResult = RegisteredResult(response.sidecar.id, response.keyResponse.privateKey, response.keyResponse.symmetricKey, response.sidecar.challenge)
 }
 
 object SidecarActor {
   def props(sidecarSupport: SidecarSupport) = Props(new SidecarActor(sidecarSupport))
-
-  case class Connected(outgoing: ActorRef)
-
-  case class Disconnect()
-
-  case class SidecarWithOutSocket(sidecar: Sidecar, socket: ActorRef) {
-    val sidecarId: UUID = sidecar.id
-  }
 
 }

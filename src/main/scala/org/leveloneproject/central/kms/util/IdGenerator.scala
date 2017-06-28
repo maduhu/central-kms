@@ -5,3 +5,4 @@ import java.util.UUID
 trait IdGenerator {
   def newId(): UUID = UUID.randomUUID()
 }
+

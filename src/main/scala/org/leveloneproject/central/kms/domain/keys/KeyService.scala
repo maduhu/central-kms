@@ -13,7 +13,7 @@ class KeyService @Inject()(
   symmetricKeyGenerator: SymmetricKeyGenerator,
   keyStore: KeyStore,
   verifier: Verifier) {
-  def create(keyRequest: CreateKeyRequest): Future[Either[Error, CreateKeyResponse]] = {
+  def create(keyRequest: CreateKeyRequest): Future[Either[KmsError, CreateKeyResponse]] = {
 
     for {
       keyPair ← asymmetricKeyGenerator.generate()
