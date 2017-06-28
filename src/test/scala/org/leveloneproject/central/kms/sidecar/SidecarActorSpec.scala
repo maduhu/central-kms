@@ -9,7 +9,7 @@ import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.Batch
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheck, HealthCheckLevel, HealthCheckStatus}
 import org.leveloneproject.central.kms.domain.keys._
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarStatus}
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarStatus, SidecarAndActor}
 import org.leveloneproject.central.kms.socket.JsonResponse
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.ArgumentMatchers._
@@ -40,7 +40,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     def setupRegistration(): Sidecar = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, symmetricKey)
       val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
-      when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName), sidecarActor)).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
       sidecar
     }
 
@@ -53,21 +53,24 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
       sidecarActor ! Register(commandId, RegisterParameters(sidecarId, serviceName))
     }
 
-    def connectAndRegisterSidecar(): Unit = {
+    def connectAndRegisterSidecar(): Sidecar = {
       connectSidecar()
       registerSidecar()
       expectRegistrationResponse()
     }
 
-    def acceptChallenge(): Unit = {
+    def acceptChallenge(sidecar: Sidecar): Unit = {
+
+      when(sidecarSupport.challenge(any())).thenReturn(Future.successful(Right(SidecarAndActor(sidecar, sidecarActor))))
       val commandId = UUID.randomUUID().toString
       sidecarActor ! Challenge(commandId, ChallengeParameters("", ""))
 
       out.expectMsg(Responses.challengeAccepted(commandId))
     }
 
-    def expectRegistrationResponse(): Unit = {
+    def expectRegistrationResponse(): Sidecar = {
       out.expectMsg(Responses.sidecarRegistered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey, challengeString)))
+      Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
     }
   }
 
@@ -100,7 +103,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
   it should "send error to out when registration fails" in new Setup {
     val error = KmsError(500, "some message")
-    when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName), sidecarActor)).thenReturn(Future.successful(Left(error)))
+    when(sidecarSupport.registerSidecar(RegisterParameters(sidecarId, serviceName))).thenReturn(Future.successful(Left(error)))
     connectSidecar()
     registerSidecar()
     out.expectMsg(Responses.commandError(commandId, error))
@@ -121,7 +124,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
   it should "send duplicate sidecar registered error to out" in new Setup {
     private val exists = KmsError.sidecarExistsError(sidecarId)
-    when(sidecarSupport.registerSidecar(any(), any())).thenReturn(Future.successful(Left(exists)))
+    when(sidecarSupport.registerSidecar(any())).thenReturn(Future.successful(Left(exists)))
     connectSidecar()
     registerSidecar()
     out.expectMsg(Responses.commandError(commandId, exists))
@@ -156,7 +159,9 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
   it should "respond ok to challenge command" in new Setup {
     setupRegistration()
-    connectAndRegisterSidecar()
+    private val sidecar = connectAndRegisterSidecar()
+
+    when(sidecarSupport.challenge(any())).thenReturn(Future.successful(Right(SidecarAndActor(sidecar, sidecarActor))))
 
     sidecarActor ! Challenge(commandId, ChallengeParameters("batchSignature", "rowSignature"))
 
@@ -164,16 +169,16 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   }
 
   "when registered" should "save batch when registered and send batch to out" in new Setup {
-    setupRegistration()
+    private val sidecar = setupRegistration()
     connectAndRegisterSidecar()
-    acceptChallenge()
+    acceptChallenge(sidecar)
 
     private val batchId = UUID.randomUUID()
     private val signature = "signature"
 
     private val batch = Batch(batchId, sidecarId, signature, Instant.now())
     private val parameters = SaveBatchParameters(batchId, signature)
-    when(sidecarSupport.createBatch(sidecarId, parameters))
+    when(sidecarSupport.createBatch(sidecar, parameters))
       .thenReturn(Future.successful(Right(batch)))
 
     sidecarActor ! SaveBatch(commandId, parameters)
@@ -181,9 +186,9 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   }
 
   it should "send health check request to web socket" in new Setup {
-    setupRegistration()
+    private val sidecar = setupRegistration()
     connectAndRegisterSidecar()
-    acceptChallenge()
+    acceptChallenge(sidecar)
 
     private val healthCheckId = UUID.randomUUID()
     private val healthCheckLevel = HealthCheckLevel.Ping
@@ -197,6 +202,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   it should "terminate sidecar and stop self when disconnected" in new Setup {
     private val sidecar = setupRegistration()
     connectAndRegisterSidecar()
+    acceptChallenge(sidecar)
 
     when(sidecarSupport.terminateSidecar(sidecar)).thenReturn(Future.successful(Right(sidecar)))
 

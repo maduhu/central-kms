@@ -4,7 +4,7 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, Props}
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, SidecarWithActor}
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarAndActor}
 import org.leveloneproject.central.kms.socket.{JsonRequest, JsonResponse}
 import org.leveloneproject.central.kms.util.JsonSerializer
 
@@ -19,9 +19,9 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
 
   def connected(out: ActorRef): Receive = {
     case Register(id, registerParameters) ⇒
-      sidecarSupport.registerSidecar(registerParameters, self) map {
+      sidecarSupport.registerSidecar(registerParameters) map {
         case Right(response) ⇒
-          become(challenged(SidecarWithActor(response.sidecar, out)))
+          become(challenged(SidecarAndOutSocket(response.sidecar, out)))
           out ! sidecarRegistered(id, response)
         case Left(error) ⇒ out ! commandError(id, error)
       }
@@ -30,25 +30,29 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
     case x ⇒ out ! x
   }
 
-  def challenged(sidecarWithActor: SidecarWithActor): Receive = {
-    case Challenge(id, params) ⇒
-      become(registered(sidecarWithActor))
-      sidecarWithActor.actor ! challengeAccepted(id)
-    case command: Command ⇒ sidecarWithActor.actor ! methodNotAllowed(command)
+  def challenged(sidecarAndOutSocket: SidecarAndOutSocket): Receive = {
+    case Challenge(id, _) ⇒ sidecarSupport.challenge(SidecarAndActor(sidecarAndOutSocket, self)) map {
+      case Right(sWithActor) ⇒
+        become(registered(SidecarAndOutSocket(sWithActor, sidecarAndOutSocket)))
+        sWithActor.actor ! challengeAccepted(id)
+      case Left(error) ⇒ sidecarAndOutSocket.out ! commandError(id, error)
+    }
+
+    case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)
     case Disconnect ⇒ terminate()
-    case x ⇒ sidecarWithActor.actor ! x
+    case x ⇒ sidecarAndOutSocket.out ! x
   }
 
-  def registered(sidecarWithActor: SidecarWithActor): Receive = {
+  def registered(sidecarAndOutSocket: SidecarAndOutSocket): Receive = {
     case CompleteRequest(jsonResponse) ⇒ handleRequest(jsonResponse)
     case SaveBatch(id, params) ⇒
-      sidecarSupport.createBatch(sidecarWithActor.sidecar.id, params).map {
+      sidecarSupport.createBatch(sidecarAndOutSocket, params).map {
         _.fold(e ⇒ commandError(id, e), batch ⇒ batchCreated(id, batch))
-      }.map { result ⇒ sidecarWithActor.actor ! result }
-    case healthCheck: HealthCheck ⇒ request(sidecarWithActor.actor, healthCheckRequest(healthCheck), completeHealthCheck)
-    case command: Command ⇒ sidecarWithActor.actor ! methodNotAllowed(command)
-    case Disconnect ⇒ sidecarSupport.terminateSidecar(sidecarWithActor.sidecar) map { _ ⇒ terminate() }
-    case x ⇒ sidecarWithActor.actor ! x
+      }.map { result ⇒ sidecarAndOutSocket.out ! result }
+    case healthCheck: HealthCheck ⇒ request(sidecarAndOutSocket, healthCheckRequest(healthCheck), completeHealthCheck)
+    case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)
+    case Disconnect ⇒ sidecarSupport.terminateSidecar(sidecarAndOutSocket) map { _ ⇒ terminate() }
+    case x ⇒ sidecarAndOutSocket.out ! x
   }
 
   def receive: Receive = {
@@ -79,6 +83,14 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
   }
 
   private implicit def toRegisteredResult(response: RegisterResponse): RegisteredResult = RegisteredResult(response.sidecar.id, response.keyResponse.privateKey, response.keyResponse.symmetricKey, response.sidecar.challenge)
+
+  private case class SidecarAndOutSocket(sidecar: Sidecar, out: ActorRef)
+
+  private object SidecarAndOutSocket {
+    implicit def toSidecar(sidecarAndOutSocket: SidecarAndOutSocket): Sidecar = sidecarAndOutSocket.sidecar
+
+    implicit def toOutSocket(sidecarAndOutSocket: SidecarAndOutSocket): ActorRef = sidecarAndOutSocket.out
+  }
 }
 
 object SidecarActor {

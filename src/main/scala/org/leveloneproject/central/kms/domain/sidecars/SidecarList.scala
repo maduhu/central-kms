@@ -12,11 +12,11 @@ import scala.util.{Failure, Success, Try}
 
 class SidecarList {
 
-  lazy val sidecars = new mutable.LinkedHashMap[UUID, SidecarWithActor]()
+  lazy val sidecars = new mutable.LinkedHashMap[UUID, SidecarAndActor]()
 
   def current(): Future[Seq[Sidecar]] = Future.successful(sidecars.values.map(_.sidecar).toSeq)
 
-  def register(sidecarWithActor: SidecarWithActor): Unit = sidecars += (sidecarWithActor.sidecar.id → sidecarWithActor)
+  def register(sidecarWithActor: SidecarAndActor): Unit = sidecars += (sidecarWithActor.sidecar.id → sidecarWithActor)
 
   def unregister(id: UUID): Unit = sidecars -= id
 

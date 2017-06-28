@@ -34,7 +34,7 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     final val serviceName: String = "service name"
     final val sidecarActor: ActorRef = TestProbe().ref
 
-    final val registerRequest = RegisterRequest(sidecarId, serviceName, sidecarActor)
+    final val registerRequest = RegisterRequest(sidecarId, serviceName)
 
     final val challengeString: String = UUID.randomUUID().toString
     final val sidecarService = new SidecarService(sidecarRepository, keyService, clock, sidecarList, sidecarLogsRepository) with ChallengeGenerator with IdGenerator {
@@ -89,11 +89,11 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, now, SidecarStatus.Registered))))
     private val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
 
-    private val sidecarWithActor = SidecarWithActor(sidecar, sidecarActor)
+    private val sidecarWithActor = SidecarAndActor(sidecar, sidecarActor)
 
     await(sidecarService.challengeAccepted(sidecarWithActor))
 
-    verify(sidecarList, times(1)).register(SidecarWithActor(sidecar.copy(status = SidecarStatus.Registered),sidecarActor))
+    verify(sidecarList, times(1)).register(SidecarAndActor(sidecar.copy(status = SidecarStatus.Registered),sidecarActor))
   }
 
   "terminate" should "insert terminated log in repo" in new Setup {

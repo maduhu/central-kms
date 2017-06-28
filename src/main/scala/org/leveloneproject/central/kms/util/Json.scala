@@ -9,6 +9,7 @@ import org.json4s._
 import org.json4s.ext.JavaTypesSerializers
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheckLevel, HealthCheckStatus}
+import org.leveloneproject.central.kms.domain.sidecars.SidecarStatus
 import org.leveloneproject.central.kms.socket._
 
 import scala.util.{Failure, Success, Try}
@@ -71,13 +72,15 @@ trait JsonDeserializer extends JsonSerialization with JsonFormats {
 
 object CustomSerializers {
 
-  val defaults = Seq(InstantSerializer, HealthCheckLevelSerializer, HealthCheckStatusSerializer, JsonMessageSerializer)
+  val defaults = Seq(InstantSerializer, HealthCheckLevelSerializer, HealthCheckStatusSerializer, SidecarStatusSerializer, JsonMessageSerializer)
 
   object InstantSerializer extends InstantSerializer(DateTimeFormatter.ISO_INSTANT)
 
   object HealthCheckLevelSerializer extends HealthCheckLevelSerializer
 
   object HealthCheckStatusSerializer extends HealthCheckStatusSerializer
+
+  object SidecarStatusSerializer extends SidecarStatusSerializer
 
   object JsonMessageSerializer extends JsonMessageSerializer
 
@@ -103,6 +106,20 @@ object CustomSerializers {
   }, {
     case l: HealthCheckStatus ⇒ JString(l.value)
   }
+  ))
+
+  class SidecarStatusSerializer extends CustomSerializer[SidecarStatus](_ ⇒ (
+    {
+      case JString(s) ⇒ s match {
+        case "registered" ⇒ SidecarStatus.Registered
+        case "terminated" ⇒ SidecarStatus.Terminated
+        case "challenged" ⇒ SidecarStatus.Challenged
+        case "suspended" ⇒ SidecarStatus.Suspended
+      }
+    },
+    {
+      case l: SidecarStatus ⇒ JString(l.value)
+    }
   ))
 
   class JsonMessageSerializer extends Serializer[JsonMessage] {

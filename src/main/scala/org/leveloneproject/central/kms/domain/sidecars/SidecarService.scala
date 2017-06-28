@@ -31,7 +31,7 @@ class SidecarService @Inject()(
     } yield RegisterResponse(s, k)
   }
 
-  def challengeAccepted(sidecarWithActor: SidecarWithActor): Future[Either[KmsError, SidecarWithActor]] = {
+  def challengeAccepted(sidecarWithActor: SidecarAndActor): Future[Either[KmsError, SidecarAndActor]] = {
     FutureEither(updateStatus(sidecarWithActor.sidecar, SidecarStatus.Registered)).map { sidecar ⇒
       val n = sidecarWithActor.copy(sidecar = sidecar)
       sidecarList.register(n)
@@ -46,7 +46,7 @@ class SidecarService @Inject()(
     } yield Right(updated)
   }
 
-  def active(): Future[Seq[Sidecar]] = sidecarList.current()
+  def active(): Future[Seq[ApiSidecar]] = sidecarList.current().map(_.map(s ⇒ ApiSidecar(s.id, s.serviceName, s.status)))
 
   private def updateStatus(sidecar: Sidecar, newStatus: SidecarStatus): FutureEither[KmsError, Sidecar] = {
     val updated = sidecar.copy(status = newStatus)

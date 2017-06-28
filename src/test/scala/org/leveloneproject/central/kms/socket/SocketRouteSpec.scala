@@ -7,11 +7,12 @@ import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.Batch
 import org.leveloneproject.central.kms.domain.keys.CreateKeyResponse
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarStatus}
+import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarStatus, SidecarAndActor}
 import org.leveloneproject.central.kms.sidecar.{SaveBatchParameters, SidecarSupport}
 import org.leveloneproject.central.kms.utils.MessageBuilder
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
+import org.mockito.invocation.InvocationOnMock
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -29,10 +30,12 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     final val privateKey: String = "batch key"
     final val rowKey: String = "row key"
 
-    def setupRegistration(): Unit = {
+    def setupRegistration(): Sidecar = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, rowKey)
       val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challenge)
-      when(sidecarSupport.registerSidecar(any(), any())).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarSupport.registerSidecar(any())).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarSupport.challenge(any())).thenAnswer((invocation: InvocationOnMock) => Future.successful(Right(invocation.getArgument[SidecarAndActor](0))))
+      sidecar
     }
   }
 
@@ -50,7 +53,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     private val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage("test")
-      wsClient.expectMessage("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%s,\"message\":\"%s\"},\"id\":null}".format(parseError.code, parseError.message))
+      wsClient.expectMessage(s"""{"jsonrpc":"2.0","error":{"code":${parseError.code},"message":"${parseError.message}"},"id":null}""")
     }
   }
 
@@ -73,16 +76,16 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
       wsClient.sendMessage(registerRequest("test", sidecarId, serviceName))
       wsClient.expectMessage(registerResponse("test", sidecarId, privateKey, rowKey, challenge))
       wsClient.sendMessage(registerRequest("test2"))
-      wsClient.expectMessage("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":%s,\"message\":\"%s\"},\"id\":\"test2\"}".format(100, "'register' method not allowed in current state"))
+      wsClient.expectMessage(s"""{"jsonrpc":"2.0","error":{"code":100,"message":"'register' method not allowed in current state"},"id":"test2"}""")
     }
   }
 
   it should "return batch id when registered sidecar issues batch" in new Setup {
-    setupRegistration()
+    private val sidecar = setupRegistration()
     private val batchId = UUID.randomUUID()
     private val signature = "some signature"
     val socketRouter = new SocketRouter(webSocketService)
-    when(sidecarSupport.createBatch(sidecarId, SaveBatchParameters(batchId, signature))).thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
+    when(sidecarSupport.createBatch(sidecar, SaveBatchParameters(batchId, signature))).thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest("register1", sidecarId, serviceName))
