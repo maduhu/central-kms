@@ -13,6 +13,7 @@ import org.leveloneproject.central.kms.util.{ChallengeGenerator, IdGenerator}
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
+import org.mockito.invocation.InvocationOnMock
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -94,6 +95,17 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     await(sidecarService.challengeAccepted(sidecarWithActor))
 
     verify(sidecarList, times(1)).register(SidecarAndActor(sidecar.copy(status = SidecarStatus.Registered),sidecarActor))
+  }
+
+  "suspend" should "insert suspended and terminated logs in repo" in new Setup {
+    private val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
+
+    private val reason = "reason"
+    when(sidecarLogsRepository.save(any())(any())).thenAnswer((invocation: InvocationOnMock) ⇒ Future.successful(Right(invocation.getArgument[SidecarLog](0))))
+    when(sidecarRepository.updateStatus(sidecarId, SidecarStatus.Terminated)).thenReturn(Future.successful(Right(1)))
+    await(sidecarService.suspend(sidecar, reason))
+    verify(sidecarLogsRepository, times(1)).save(SidecarLog(logId, sidecarId, now, SidecarStatus.Suspended, Some(reason)))
+    verify(sidecarLogsRepository, times(1)).save(SidecarLog(logId, sidecarId, now, SidecarStatus.Terminated, None))
   }
 
   "terminate" should "insert terminated log in repo" in new Setup {

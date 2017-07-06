@@ -8,12 +8,12 @@ val akkaHttpVersion = "10.0.5"
 val slickVersion = "3.2.0"
 val json4sVersion = "3.5.2"
 libraryDependencies ++= Seq(
-  "net.i2p.crypto"      % "eddsa"                 % "0.2.0",
   "com.typesafe.akka"   %% "akka-actor"           % akkaVersion,
   "com.typesafe.akka"   %% "akka-http"            % akkaHttpVersion,
   "org.json4s"          %% "json4s-native"        % json4sVersion,
   "org.json4s"          %% "json4s-ext"           % json4sVersion,
   "de.heikoseeberger"   %% "akka-http-json4s"     % "1.16.1",
+  "org.bouncycastle"    % "bcprov-jdk15on"        % "1.57",
   "com.typesafe.slick"  %% "slick"                % slickVersion,
   "com.typesafe.slick"  %% "slick-hikaricp"       % slickVersion exclude("com.zaxxer.HikariCP", "HikariCP"),
   "org.slf4j"           % "slf4j-nop"             % "1.6.4",

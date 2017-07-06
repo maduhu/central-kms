@@ -10,8 +10,13 @@ import org.leveloneproject.central.kms.domain.sidecars._
 
 import scala.concurrent.Future
 import scala.language.implicitConversions
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class SidecarSupport @Inject()(batchService: BatchService, sidecarService: SidecarService, healthCheckService: HealthCheckService) {
+class SidecarActions @Inject()(batchService: BatchService,
+                               sidecarService: SidecarService,
+                               healthCheckService: HealthCheckService,
+                               challengeVerifier: ChallengeVerifier) {
+
   def createBatch(sidecar: Sidecar, params: SaveBatchParameters): Future[Either[KmsError, Batch]] = {
     batchService.create(CreateBatchRequest(sidecar.id, params.id, params.signature))
   }
@@ -20,8 +25,15 @@ class SidecarSupport @Inject()(batchService: BatchService, sidecarService: Sidec
     sidecarService.register(RegisterRequest(registerParameters.id, registerParameters.serviceName))
   }
 
-  def challenge(sidecarWithActor: SidecarAndActor): Future[Either[KmsError, SidecarAndActor]] = {
-    sidecarService.challengeAccepted(sidecarWithActor)
+  def challenge(sidecarWithActor: SidecarAndActor, keys: ChallengeKeys, answer: ChallengeAnswer): Future[Either[KmsError, SidecarAndActor]] = {
+    challengeVerifier.verify(sidecarWithActor.sidecar.challenge, keys, answer) match {
+      case Left(e) ⇒
+        sidecarService.suspend(sidecarWithActor, e.message) map {
+          case Left(suspendError) ⇒ Left(e)
+          case Right(_) ⇒ Left(e)
+        }
+      case Right(_) ⇒ sidecarService.challengeAccepted(sidecarWithActor)
+    }
   }
 
   def terminateSidecar(sidecar: Sidecar): Future[Either[KmsError, Sidecar]] = {

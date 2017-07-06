@@ -3,12 +3,12 @@ package org.leveloneproject.central.kms.socket
 import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.model.ws.Message
+import akka.stream._
 import akka.stream.scaladsl.{Flow, Sink, Source}
-import akka.stream.{ActorMaterializer, OverflowStrategy}
 import com.google.inject.Inject
 import org.leveloneproject.central.kms.sidecar._
 
-class WebSocketService @Inject()(sidecarSupport: SidecarSupport)
+class WebSocketService @Inject()(sidecarSupport: SidecarActions)
                                 (implicit val system: ActorSystem, implicit val materializer: ActorMaterializer) extends InputConverter with OutputConverter {
 
   private def commandExecutionFlow(sidecarActor: ActorRef): Flow[AnyRef, AnyRef, NotUsed] = {
@@ -29,3 +29,4 @@ class WebSocketService @Inject()(sidecarSupport: SidecarSupport)
       .map(a ⇒ toMessage(a).orNull)
   }
 }
+

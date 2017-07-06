@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.ActorRef
 import org.leveloneproject.central.kms.domain.KmsError
+import org.leveloneproject.central.kms.domain.sidecars.ChallengeAnswer
 import org.leveloneproject.central.kms.socket.{JsonMessage, JsonRequest, JsonResponse}
 import org.leveloneproject.central.kms.util.JsonDeserializer
 
@@ -28,7 +29,7 @@ trait SidecarMessageParser extends JsonDeserializer {
   }
 
   private def challenge(request: JsonRequest): Either[JsonResponse, Challenge] = {
-    extractParameters[ChallengeParameters](request).map(Challenge(request.id, _))
+    extractParameters[ChallengeAnswer](request).map(Challenge(request.id, _))
   }
 
   private def saveBatch(request: JsonRequest): Either[JsonResponse, SaveBatch] = {
@@ -59,9 +60,7 @@ case class SaveBatchParameters(id: UUID, signature: String)
 
 case class SaveBatch(id: String, params: SaveBatchParameters) extends Command("batch")
 
-case class Challenge(id: String, params: ChallengeParameters) extends Command("challenge")
-
-case class ChallengeParameters(batchSignature: String, rowSignature: String)
+case class Challenge(id: String, params: ChallengeAnswer) extends Command("challenge")
 
 case class CompleteRequest(request: JsonResponse) extends SidecarMessage
 

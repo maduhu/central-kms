@@ -1,6 +1,6 @@
 package org.leveloneproject.central.kms.config
 
-import java.security.KeyPairGeneratorSpi
+import java.security.Security
 import java.time.Clock
 
 import akka.actor.ActorSystem
@@ -9,11 +9,11 @@ import com.google.inject.Singleton
 import com.typesafe.config.Config
 import com.tzavellas.sse.guice.ScalaModule
 import net.codingwell.scalaguice.ScalaMultibinder
-import net.i2p.crypto.eddsa.KeyPairGenerator
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.flywaydb.core.Flyway
 import org.leveloneproject.central.kms.Service
+import org.leveloneproject.central.kms.crypto._
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckRouter
-import org.leveloneproject.central.kms.domain.keys.AsymmetricKeyGenerator
 import org.leveloneproject.central.kms.domain.sidecars.{SidecarList, SidecarRouter}
 import org.leveloneproject.central.kms.persistance._
 import org.leveloneproject.central.kms.persistance.postgres._
@@ -25,12 +25,16 @@ class MainModule(config: Config) extends ScalaModule {
   implicit val system = ActorSystem("kms", config)
 
   def configure(): Unit = {
+
+    Security.addProvider(new BouncyCastleProvider)
+
     implicit val materializer = ActorMaterializer()
 
+    val asymmetric = new TweetNaClKeys()
+    val symmetric = new CmacKeys
     bind[Config].toInstance(config)
     bind[ActorSystem].toInstance(system)
     bind[ActorMaterializer].toInstance(materializer)
-    bind[KeyPairGeneratorSpi].to[KeyPairGenerator]
     bind[SidecarList].in[Singleton]
     bindDatabase
     bind[Clock].toInstance(Clock.systemUTC())
@@ -38,7 +42,10 @@ class MainModule(config: Config) extends ScalaModule {
     bind[Flyway]
     bind[Migrator]
     bind[Service]
-    bind[AsymmetricKeyGenerator]
+    bind[AsymmetricKeyGenerator].toInstance(asymmetric)
+    bind[SymmetricKeyGenerator].toInstance(symmetric)
+    bind[AsymmetricVerifier].toInstance(asymmetric)
+    bind[SymmetricVerifier].toInstance(symmetric)
     bind[RouteAggregator]
     bind[WebSocketService]
 

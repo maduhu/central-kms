@@ -1,9 +1,9 @@
 package org.leveloneproject.central.kms.domain.keys
 
-import java.security.PublicKey
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
+import org.leveloneproject.central.kms.crypto._
 import org.leveloneproject.central.kms.domain._
 import org.leveloneproject.central.kms.persistance.KeyStore
 import org.mockito.ArgumentMatchers._
@@ -19,7 +19,7 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
     val asymmetricKeyGenerator: AsymmetricKeyGenerator = mock[AsymmetricKeyGenerator]
     val symmetricKeyGenerator: SymmetricKeyGenerator = mock[SymmetricKeyGenerator]
     val store: KeyStore = mock[KeyStore]
-    val verifier: Verifier = mock[Verifier]
+    val verifier: AsymmetricVerifier = mock[AsymmetricVerifier]
     val keyService = new KeyService(asymmetricKeyGenerator, symmetricKeyGenerator, store, verifier)
     val keyId: UUID = UUID.randomUUID()
     val serviceName: String = UUID.randomUUID().toString
@@ -65,32 +65,32 @@ class KeyServiceSpec extends FlatSpec with Matchers with MockitoSugar with Await
   "validate" should "return not found response if key not in store" in new Setup {
     when(store.getById(keyId)).thenReturn(Future(None))
 
-    val result: Either[ValidateError, ValidateResponse] = await(keyService.validate(ValidateRequest(keyId, "", "")))
-    assert(result == Left(ValidateErrors.KeyNotFound))
+    val result: Either[VerificationError, VerificationResult] = await(keyService.validate(ValidateRequest(keyId, "", "")))
+    assert(result == Left(VerificationError.KeyNotFound))
   }
 
   it should "return invalid signature response if signature not verified" in new Setup {
-    private val pubKey = mock[PublicKey]
+    private val pubKey = "public key"
     private val key = mock[Key]
-    when(key.cryptoKey).thenReturn(pubKey)
+    when(key.publicKey).thenReturn(pubKey)
     when(store.getById(keyId)).thenReturn(Future(Some(key)))
     private val signature = "signature"
     private val message = "message"
-    when(verifier.verify(pubKey, signature, message)).thenReturn(Left(ValidateErrors.InvalidSignature))
+    when(verifier.verify(pubKey, signature, message)).thenReturn(Left(VerificationError.InvalidSignature))
 
-    assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Left(ValidateErrors.InvalidSignature))
+    assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Left(VerificationError.InvalidSignature))
   }
 
   it should "return success if signature verified" in new Setup {
-    private val pubKey = mock[PublicKey]
+    private val pubKey = "public key"
     private val key = mock[Key]
-    when(key.cryptoKey).thenReturn(pubKey)
+    when(key.publicKey).thenReturn(pubKey)
     when(store.getById(keyId)).thenReturn(Future(Some(key)))
     private val signature = "signature"
     private val message = "message"
-    when(verifier.verify(pubKey, signature, message)).thenReturn(Right(ValidateResponses.Success))
+    when(verifier.verify(pubKey, signature, message)).thenReturn(Right(VerificationResult.Success))
 
-    assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Right(ValidateResponses.Success))
+    assert(await(keyService.validate(ValidateRequest(keyId, signature, message))) == Right(VerificationResult.Success))
   }
 
 }

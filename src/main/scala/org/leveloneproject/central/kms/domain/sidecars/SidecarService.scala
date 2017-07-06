@@ -39,7 +39,14 @@ class SidecarService @Inject()(
     }
   }
 
-  def terminate(sidecar: Sidecar): Future[Either[KmsError, Sidecar]] = {
+  def suspend(sidecar: Sidecar, reason: String): Future[Either[KmsError, Sidecar]] = {
+    for {
+      _ ← logStatusChange(sidecar.id, SidecarStatus.Suspended, Some(reason))
+      terminated ← terminate(sidecar)
+    } yield terminated
+  }
+
+  def terminate(sidecar: Sidecar): FutureEither[KmsError, Sidecar] = {
     for {
       updated ← updateStatus(sidecar, SidecarStatus.Terminated)
       _ ← Future.successful(sidecarList.unregister(sidecar.id))
@@ -48,10 +55,10 @@ class SidecarService @Inject()(
 
   def active(): Future[Seq[ApiSidecar]] = sidecarList.current().map(_.map(s ⇒ ApiSidecar(s.id, s.serviceName, s.status)))
 
-  private def updateStatus(sidecar: Sidecar, newStatus: SidecarStatus): FutureEither[KmsError, Sidecar] = {
+  private def updateStatus(sidecar: Sidecar, newStatus: SidecarStatus, message: Option[String] = None): FutureEither[KmsError, Sidecar] = {
     val updated = sidecar.copy(status = newStatus)
     for {
-      _ ← logStatusChange(sidecar.id, newStatus)
+      _ ← logStatusChange(sidecar.id, newStatus, message)
       _ ← sidecarRepository.updateStatus(sidecar.id, newStatus)
     } yield Right(updated)
   }

@@ -7,8 +7,8 @@ import akka.http.scaladsl.testkit.{ScalatestRouteTest, WSProbe}
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.Batch
 import org.leveloneproject.central.kms.domain.keys.CreateKeyResponse
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarStatus, SidecarAndActor}
-import org.leveloneproject.central.kms.sidecar.{SaveBatchParameters, SidecarSupport}
+import org.leveloneproject.central.kms.domain.sidecars._
+import org.leveloneproject.central.kms.sidecar.{SaveBatchParameters, SidecarActions}
 import org.leveloneproject.central.kms.utils.MessageBuilder
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
@@ -21,8 +21,8 @@ import scala.concurrent.Future
 class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with ScalatestRouteTest with MessageBuilder {
 
   trait Setup {
-    final val sidecarSupport: SidecarSupport = mock[SidecarSupport]
-    final val webSocketService: WebSocketService = new WebSocketService(sidecarSupport)
+    final val sidecarActions: SidecarActions = mock[SidecarActions]
+    final val webSocketService: WebSocketService = new WebSocketService(sidecarActions)
     final val sidecarId: UUID = UUID.randomUUID()
     final val serviceName: String = "some service"
     final val challenge: String = UUID.randomUUID().toString
@@ -33,8 +33,8 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     def setupRegistration(): Sidecar = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, rowKey)
       val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challenge)
-      when(sidecarSupport.registerSidecar(any())).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
-      when(sidecarSupport.challenge(any())).thenAnswer((invocation: InvocationOnMock) => Future.successful(Right(invocation.getArgument[SidecarAndActor](0))))
+      when(sidecarActions.registerSidecar(any())).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarActions.challenge(any(), any(), any())).thenAnswer((invocation: InvocationOnMock) => Future.successful(Right(invocation.getArgument[SidecarAndActor](0))))
       sidecar
     }
   }
@@ -85,7 +85,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     private val batchId = UUID.randomUUID()
     private val signature = "some signature"
     val socketRouter = new SocketRouter(webSocketService)
-    when(sidecarSupport.createBatch(sidecar, SaveBatchParameters(batchId, signature))).thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
+    when(sidecarActions.createBatch(sidecar, SaveBatchParameters(batchId, signature))).thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest("register1", sidecarId, serviceName))
@@ -94,6 +94,22 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
       wsClient.expectMessage(challengeResponse("challenge1"))
       wsClient.sendMessage(batchRequest("batch1", batchId, signature))
       wsClient.expectMessage(batchResponse("batch1", batchId))
+    }
+  }
+
+  it should "terminate client on challenge failure" in new Setup {
+    private val challengeRequestId = UUID.randomUUID.toString
+    private val sidecar = setupRegistration()
+    private val invalidRowSignature = ChallengeError.invalidRowSignature
+    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future.successful(Left(invalidRowSignature)))
+    val socketRouter = new SocketRouter(webSocketService)
+    val wsClient = WSProbe()
+    WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
+      wsClient.sendMessage(registerRequest("register1", sidecarId, serviceName))
+      wsClient.expectMessage(registerResponse("register1", sidecarId, privateKey, rowKey, challenge))
+      wsClient.sendMessage(challengeRequest(challengeRequestId))
+      wsClient.expectMessage(s"""{"jsonrpc":"2.0","error":{"code":${invalidRowSignature.code},"message":"${invalidRowSignature.message}"},"id":"$challengeRequestId"}""")
+      wsClient.expectCompletion()
     }
   }
 }

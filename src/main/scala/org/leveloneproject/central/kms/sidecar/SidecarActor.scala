@@ -2,15 +2,15 @@ package org.leveloneproject.central.kms.sidecar
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
-import org.leveloneproject.central.kms.domain.sidecars.{RegisterResponse, Sidecar, SidecarAndActor}
+import org.leveloneproject.central.kms.domain.sidecars._
 import org.leveloneproject.central.kms.socket.{JsonRequest, JsonResponse}
 import org.leveloneproject.central.kms.util.JsonSerializer
 
 import scala.language.implicitConversions
 
-class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerializer {
+class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerializer {
 
   import Responses._
   import context._
@@ -19,9 +19,9 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
 
   def connected(out: ActorRef): Receive = {
     case Register(id, registerParameters) ⇒
-      sidecarSupport.registerSidecar(registerParameters) map {
+      sidecarActions.registerSidecar(registerParameters) map {
         case Right(response) ⇒
-          become(challenged(SidecarAndOutSocket(response.sidecar, out)))
+          become(challenged(SidecarAndOutSocket(response.sidecar, out), ChallengeKeys("", "")))
           out ! sidecarRegistered(id, response)
         case Left(error) ⇒ out ! commandError(id, error)
       }
@@ -30,12 +30,12 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
     case x ⇒ out ! x
   }
 
-  def challenged(sidecarAndOutSocket: SidecarAndOutSocket): Receive = {
-    case Challenge(id, _) ⇒ sidecarSupport.challenge(SidecarAndActor(sidecarAndOutSocket, self)) map {
+  def challenged(sidecarAndOutSocket: SidecarAndOutSocket, keys: ChallengeKeys): Receive = {
+    case Challenge(id, answer) ⇒ sidecarActions.challenge(SidecarAndActor(sidecarAndOutSocket, self), keys, answer) map {
       case Right(sWithActor) ⇒
         become(registered(SidecarAndOutSocket(sWithActor, sidecarAndOutSocket)))
-        sWithActor.actor ! challengeAccepted(id)
-      case Left(error) ⇒ sidecarAndOutSocket.out ! commandError(id, error)
+        sidecarAndOutSocket.out ! challengeAccepted(id, ChallengeResult.success)
+      case Left(error) ⇒ disconnectClientWithMessage(sidecarAndOutSocket.out, commandError(id, error))
     }
 
     case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)
@@ -46,12 +46,12 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
   def registered(sidecarAndOutSocket: SidecarAndOutSocket): Receive = {
     case CompleteRequest(jsonResponse) ⇒ handleRequest(jsonResponse)
     case SaveBatch(id, params) ⇒
-      sidecarSupport.createBatch(sidecarAndOutSocket, params).map {
+      sidecarActions.createBatch(sidecarAndOutSocket, params).map {
         _.fold(e ⇒ commandError(id, e), batch ⇒ batchCreated(id, batch))
       }.map { result ⇒ sidecarAndOutSocket.out ! result }
     case healthCheck: HealthCheck ⇒ request(sidecarAndOutSocket, healthCheckRequest(healthCheck), completeHealthCheck)
     case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)
-    case Disconnect ⇒ sidecarSupport.terminateSidecar(sidecarAndOutSocket) map { _ ⇒ terminate() }
+    case Disconnect ⇒ sidecarActions.terminateSidecar(sidecarAndOutSocket) map { _ ⇒ terminate() }
     case x ⇒ sidecarAndOutSocket.out ! x
   }
 
@@ -62,6 +62,12 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
   private def request(out: ActorRef, request: JsonRequest, handler: (String, AnyRef) ⇒ Unit) = {
     requests += request.id → handler
     out ! request
+  }
+
+  private def disconnectClientWithMessage[T](client: ActorRef, message: T) = {
+    client ! message
+    client ! PoisonPill
+    terminate()
   }
 
   private def terminate(): Unit = {
@@ -79,7 +85,7 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
   }
 
   private def completeHealthCheck(healthCheckId: String, result: AnyRef): Unit = {
-    sidecarSupport.completeHealthCheck(UUID.fromString(healthCheckId), serialize(result))
+    sidecarActions.completeHealthCheck(UUID.fromString(healthCheckId), serialize(result))
   }
 
   private implicit def toRegisteredResult(response: RegisterResponse): RegisteredResult = RegisteredResult(response.sidecar.id, response.keyResponse.privateKey, response.keyResponse.symmetricKey, response.sidecar.challenge)
@@ -91,9 +97,10 @@ class SidecarActor(sidecarSupport: SidecarSupport) extends Actor with JsonSerial
 
     implicit def toOutSocket(sidecarAndOutSocket: SidecarAndOutSocket): ActorRef = sidecarAndOutSocket.out
   }
+
 }
 
 object SidecarActor {
-  def props(sidecarSupport: SidecarSupport) = Props(new SidecarActor(sidecarSupport))
+  def props(sidecarActions: SidecarActions) = Props(new SidecarActor(sidecarActions))
 
 }

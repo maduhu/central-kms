@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import akka.util.ByteString
+import org.leveloneproject.central.kms.domain.sidecars.ChallengeAnswer
 import org.leveloneproject.central.kms.sidecar._
 import org.leveloneproject.central.kms.utils.MessageBuilder
 import org.scalatest.{FlatSpec, Matchers}
@@ -98,6 +99,6 @@ class InputConverterSpec extends FlatSpec with Matchers with MessageBuilder {
     private val rowSignature = UUID.randomUUID().toString
     val message = TextMessage.Strict(s"""{"jsonrpc":"2.0","id":"$commandId","method":"challenge","params":{"batchSignature":"$batchSignature","rowSignature":"$rowSignature"}}""")
 
-    converter.fromMessage(message) shouldBe Challenge(commandId, ChallengeParameters(batchSignature, rowSignature))
+    converter.fromMessage(message) shouldBe Challenge(commandId, ChallengeAnswer(batchSignature, rowSignature))
   }
 }

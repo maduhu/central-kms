@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.http.scaladsl.model.ws.TextMessage
 import org.leveloneproject.central.kms.domain._
+import org.leveloneproject.central.kms.domain.sidecars.ChallengeResult
 import org.leveloneproject.central.kms.sidecar.Responses
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -28,7 +29,7 @@ class OutputConverterSpec extends FlatSpec with Matchers with OutputConverter {
 
   it should "convert challengeAccepted to json response" in {
     val commandId = UUID.randomUUID().toString
-    val response = Responses.challengeAccepted(commandId)
+    val response = Responses.challengeAccepted(commandId, ChallengeResult.success)
     toMessage(response) shouldBe Some(TextMessage.Strict(s"""{"jsonrpc":"2.0","result":{"status":"OK"},"id":"$commandId"}"""))
   }
 }
