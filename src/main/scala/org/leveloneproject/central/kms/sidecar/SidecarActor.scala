@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorRef, PoisonPill, Props}
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
+import org.leveloneproject.central.kms.domain.inquiries.Inquiry
 import org.leveloneproject.central.kms.domain.sidecars._
 import org.leveloneproject.central.kms.socket.{JsonRequest, JsonResponse}
 import org.leveloneproject.central.kms.util.JsonSerializer
@@ -21,7 +22,7 @@ class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerial
     case Register(id, registerParameters) ⇒
       sidecarActions.registerSidecar(registerParameters) map {
         case Right(response) ⇒
-          become(challenged(SidecarAndOutSocket(response.sidecar, out), ChallengeKeys("", "")))
+          become(challenged(SidecarAndOutSocket(response.sidecar, out), ChallengeKeys(response.keyResponse.publicKey, response.keyResponse.symmetricKey)))
           out ! sidecarRegistered(id, response)
         case Left(error) ⇒ out ! commandError(id, error)
       }
@@ -50,6 +51,7 @@ class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerial
         _.fold(e ⇒ commandError(id, e), batch ⇒ batchCreated(id, batch))
       }.map { result ⇒ sidecarAndOutSocket.out ! result }
     case healthCheck: HealthCheck ⇒ request(sidecarAndOutSocket, healthCheckRequest(healthCheck), completeHealthCheck)
+    case inquiry: Inquiry ⇒ sidecarAndOutSocket.out ! inquiryCommand(inquiry)
     case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)
     case Disconnect ⇒ sidecarActions.terminateSidecar(sidecarAndOutSocket) map { _ ⇒ terminate() }
     case x ⇒ sidecarAndOutSocket.out ! x

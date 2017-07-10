@@ -7,6 +7,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.Batch
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheck, HealthCheckLevel, HealthCheckStatus}
+import org.leveloneproject.central.kms.domain.inquiries.{Inquiry, InquiryStatus}
 import org.leveloneproject.central.kms.domain.keys._
 import org.leveloneproject.central.kms.domain.sidecars._
 import org.leveloneproject.central.kms.socket.JsonResponse
@@ -217,6 +218,17 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
 
     sidecarActor ! Disconnect
     sidecarActor.underlying.isTerminated shouldBe true
+  }
+
+  it should "send inquiry command to socket" in new Setup {
+    private val sidecar = setupRegistration()
+    connectAndRegisterSidecar()
+    acceptChallenge(sidecar)
+    private val now = Instant.now()
+
+    private val inquiry = Inquiry(UUID.randomUUID(), serviceName, now, now, now, InquiryStatus.Created, sidecarId)
+    sidecarActor ! inquiry
+    out.expectMsg(Responses.inquiryCommand(inquiry))
   }
 }
 

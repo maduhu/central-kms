@@ -1,12 +1,13 @@
 package org.leveloneproject.central.kms.domain.batches
 
 import java.sql.SQLException
-import java.time.{Clock, Instant}
+import java.time.Instant
 import java.util.UUID
 
 import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.persistance.BatchRepository
+import org.leveloneproject.central.kms.util.InstantProvider
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import org.scalatest.mockito.MockitoSugar
@@ -18,19 +19,20 @@ class BatchServiceSpec extends FlatSpec with Matchers with MockitoSugar with Awa
 
   trait Setup {
     val repo: BatchRepository = mock[BatchRepository]
-    val clock: Clock = mock[Clock]
-    val service = new BatchService(repo, clock)
+    val currentInstant: Instant = Instant.now()
+
+    val service = new BatchService(repo) with InstantProvider {
+      override def now(): Instant = currentInstant
+    }
     val sidecarId: UUID = UUID.randomUUID()
     val batchId: UUID = UUID.randomUUID()
-    val now: Instant = Instant.now()
-    when(clock.instant()).thenReturn(now)
   }
 
   "create" should "save batch to repo" in new Setup {
     when(repo.insert(any())).thenReturn(Future.successful((): Unit))
 
     private val result = await(service.create(CreateBatchRequest(sidecarId, batchId, "signature")))
-    private val batch = Batch(batchId, sidecarId, "signature", now)
+    private val batch = Batch(batchId, sidecarId, "signature", currentInstant)
     result shouldBe Right(batch)
 
     verify(repo, times(1)).insert(batch)

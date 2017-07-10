@@ -6,3 +6,5 @@ trait IdGenerator {
   def newId(): UUID = UUID.randomUUID()
 }
 
+
+

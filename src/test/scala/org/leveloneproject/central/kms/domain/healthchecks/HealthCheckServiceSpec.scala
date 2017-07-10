@@ -1,6 +1,6 @@
 package org.leveloneproject.central.kms.domain.healthchecks
 
-import java.time.{Clock, Instant}
+import java.time.Instant
 import java.util.UUID
 
 import akka.testkit.TestProbe
@@ -10,7 +10,7 @@ import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckLevel.Ping
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckStatus.Pending
 import org.leveloneproject.central.kms.domain.sidecars.SidecarList
 import org.leveloneproject.central.kms.persistance.HealthCheckRepository
-import org.leveloneproject.central.kms.util.IdGenerator
+import org.leveloneproject.central.kms.util.{IdGenerator, InstantProvider}
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.Mockito._
 import org.scalatest.mockito.MockitoSugar
@@ -22,15 +22,14 @@ class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with M
 
   trait Setup {
     final val healthCheckRepo: HealthCheckRepository = mock[HealthCheckRepository]
-    final val clock: Clock = mock[Clock]
-    final val now: Instant = Instant.now()
-    when(clock.instant()).thenReturn(now)
+    final val currentInstant: Instant = Instant.now()
     final val sidecarList: SidecarList = mock[SidecarList]
-
     final val healthCheckId: UUID = UUID.randomUUID()
 
-    val service: HealthCheckService = new HealthCheckService(healthCheckRepo, clock, sidecarList) with IdGenerator {
+    val service: HealthCheckService = new HealthCheckService(healthCheckRepo, sidecarList) with IdGenerator with InstantProvider {
       override def newId(): UUID = healthCheckId
+
+      override def now(): Instant = currentInstant
     }
 
     final val sidecarId: UUID = UUID.randomUUID()
@@ -39,11 +38,11 @@ class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with M
   "create" should "create, save and return new HealthCheck" in new Setup {
     val request = CreateHealthCheckRequest(sidecarId, Ping)
 
-    private val check = HealthCheck(healthCheckId, sidecarId, Ping, now, Pending)
+    private val check = HealthCheck(healthCheckId, sidecarId, Ping, currentInstant, Pending)
 
     private val sidecarProbe = TestProbe()
-    when(sidecarList.actorById(sidecarId)).thenReturn(Future.successful(Right(sidecarProbe.ref)))
-    when(healthCheckRepo.insert(check)).thenReturn(Future.successful((): Unit))
+    when(sidecarList.actorById(sidecarId)).thenReturn(Some(sidecarProbe.ref))
+    when(healthCheckRepo.insert(check)).thenReturn(Future.successful(check))
 
     await(service.create(request)) shouldBe Right(check)
 
@@ -55,7 +54,7 @@ class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with M
     val request = CreateHealthCheckRequest(sidecarId, Ping)
 
     private val error = KmsError.unregisteredSidecar(sidecarId)
-    when(sidecarList.actorById(sidecarId)).thenReturn(Future.successful(Left(error)))
+    when(sidecarList.actorById(sidecarId)).thenReturn(None)
 
     await(service.create(request)) shouldBe Left(error)
   }

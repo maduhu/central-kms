@@ -17,7 +17,7 @@ trait HealthCheckRepository extends HealthChecksTable {
 
   private val db = dbProvider.db
 
-  def insert(healthCheck: HealthCheck): Future[Unit] = db.run { healthChecks += healthCheck } map { _ ⇒ }
+  def insert(healthCheck: HealthCheck): Future[HealthCheck] = db.run { healthChecks += healthCheck } map { _ ⇒ healthCheck}
 
   def complete(healthCheckId: UUID, response: String, timestamp: Instant): Future[Option[HealthCheck]] = {
 
@@ -30,3 +30,5 @@ trait HealthCheckRepository extends HealthChecksTable {
 
   }
 }
+
+

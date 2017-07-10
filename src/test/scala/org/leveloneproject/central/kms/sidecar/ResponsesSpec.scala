@@ -5,6 +5,7 @@ import java.util.UUID
 
 import org.leveloneproject.central.kms.domain.batches.Batch
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheck, HealthCheckLevel, HealthCheckStatus}
+import org.leveloneproject.central.kms.domain.inquiries.{Inquiry, InquiryStatus}
 import org.leveloneproject.central.kms.util.JsonSerializer
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -40,5 +41,15 @@ class ResponsesSpec extends FlatSpec with Matchers with JsonSerializer {
     private val registeredResult = RegisteredResult(sidecarId, batchKey, rowKey, challenge)
     private val result = serialize(sidecarRegistered(commandId, registeredResult))
     result shouldBe s"""{"jsonrpc":"2.0","result":{"id":"$sidecarId","batchKey":"$batchKey","rowKey":"$rowKey","challenge":"$challenge"},"id":"$commandId"}"""
+  }
+
+  it should "serialize inquiry command" in new Setup {
+    private val inquiryId = UUID.randomUUID()
+    private val startTime = now.minusSeconds(360000)
+    private val endTime = now.minusSeconds(10000)
+    private val inquiry = Inquiry(inquiryId, "service name", startTime, endTime, now, InquiryStatus.Created, sidecarId)
+
+    private val result = serialize(inquiryCommand(inquiry))
+    result shouldBe s"""{"jsonrpc":"2.0","id":"$inquiryId","method":"inquiry","params":{"inquiry":"$inquiryId","startTime":"${startTime}","endTime":"${endTime}"}}"""
   }
 }

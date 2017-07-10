@@ -1,6 +1,6 @@
 package org.leveloneproject.central.kms.domain.sidecars
 
-import java.time.{Clock, Instant}
+import java.time.Instant
 import java.util.UUID
 
 import akka.actor.ActorRef
@@ -9,7 +9,7 @@ import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.keys.{CreateKeyRequest, CreateKeyResponse, KeyService}
 import org.leveloneproject.central.kms.persistance.{SidecarLogsRepository, SidecarRepository}
-import org.leveloneproject.central.kms.util.{ChallengeGenerator, IdGenerator}
+import org.leveloneproject.central.kms.util.{ChallengeGenerator, IdGenerator, InstantProvider}
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
@@ -26,9 +26,7 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     final val sidecarLogsRepository: SidecarLogsRepository = mock[SidecarLogsRepository]
     final val keyService: KeyService = mock[KeyService]
     final val sidecarList: SidecarList = mock[SidecarList]
-    final val clock: Clock = mock[Clock]
-    final val now: Instant = Instant.now()
-    when(clock.instant()).thenReturn(now)
+    final val currentInstant: Instant = Instant.now()
 
     final val sidecarId: UUID = UUID.randomUUID()
     final val logId: UUID = UUID.randomUUID()
@@ -38,10 +36,12 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     final val registerRequest = RegisterRequest(sidecarId, serviceName)
 
     final val challengeString: String = UUID.randomUUID().toString
-    final val sidecarService = new SidecarService(sidecarRepository, keyService, clock, sidecarList, sidecarLogsRepository) with ChallengeGenerator with IdGenerator {
+    final val sidecarService = new SidecarService(sidecarRepository, keyService, sidecarList, sidecarLogsRepository) with ChallengeGenerator with IdGenerator with InstantProvider {
       override def newChallenge(): String = challengeString
 
       override def newId(): UUID = logId
+
+      override def now(): Instant = currentInstant
     }
   }
 
@@ -66,14 +66,14 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     when(sidecarRepository.insert(sidecar)).thenReturn(Future.successful(Right(sidecar)))
     private val keyResponse = CreateKeyResponse(UUID.randomUUID(), "public key", "private key", "symmetric key")
     when(keyService.create(CreateKeyRequest(sidecarId))).thenReturn(Future.successful(Right(keyResponse)))
-    when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, now, initialized))))
+    when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, currentInstant, initialized))))
 
     await(sidecarService.register(registerRequest)) shouldBe Right(RegisterResponse(sidecar, keyResponse))
   }
 
   it should "add initialized to logs" in new Setup {
     private val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
-    private val log = SidecarLog(logId, sidecarId, now, SidecarStatus.Challenged, None)
+    private val log = SidecarLog(logId, sidecarId, currentInstant, SidecarStatus.Challenged, None)
     private val keyResponse = CreateKeyResponse(UUID.randomUUID(), "public key", "private key", "symmetric key")
 
     when(sidecarRepository.insert(sidecar)).thenReturn(Future.successful(Right(sidecar)))
@@ -87,14 +87,14 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
 
   "challengeAccepted" should "add sidecar to sidecarList" in new Setup {
     when(sidecarRepository.updateStatus(sidecarId, SidecarStatus.Registered)).thenReturn(Future.successful(Right(1)))
-    when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, now, SidecarStatus.Registered))))
+    when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, currentInstant, SidecarStatus.Registered))))
     private val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
 
     private val sidecarWithActor = SidecarAndActor(sidecar, sidecarActor)
 
     await(sidecarService.challengeAccepted(sidecarWithActor))
 
-    verify(sidecarList, times(1)).register(SidecarAndActor(sidecar.copy(status = SidecarStatus.Registered),sidecarActor))
+    verify(sidecarList, times(1)).register(SidecarAndActor(sidecar.copy(status = SidecarStatus.Registered), sidecarActor))
   }
 
   "suspend" should "insert suspended and terminated logs in repo" in new Setup {
@@ -104,14 +104,14 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     when(sidecarLogsRepository.save(any())(any())).thenAnswer((invocation: InvocationOnMock) ⇒ Future.successful(Right(invocation.getArgument[SidecarLog](0))))
     when(sidecarRepository.updateStatus(sidecarId, SidecarStatus.Terminated)).thenReturn(Future.successful(Right(1)))
     await(sidecarService.suspend(sidecar, reason))
-    verify(sidecarLogsRepository, times(1)).save(SidecarLog(logId, sidecarId, now, SidecarStatus.Suspended, Some(reason)))
-    verify(sidecarLogsRepository, times(1)).save(SidecarLog(logId, sidecarId, now, SidecarStatus.Terminated, None))
+    verify(sidecarLogsRepository, times(1)).save(SidecarLog(logId, sidecarId, currentInstant, SidecarStatus.Suspended, Some(reason)))
+    verify(sidecarLogsRepository, times(1)).save(SidecarLog(logId, sidecarId, currentInstant, SidecarStatus.Terminated, None))
   }
 
   "terminate" should "insert terminated log in repo" in new Setup {
     private val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
 
-    private val log = SidecarLog(logId, sidecarId, now, SidecarStatus.Terminated, None)
+    private val log = SidecarLog(logId, sidecarId, currentInstant, SidecarStatus.Terminated, None)
     when(sidecarLogsRepository.save(log)).thenReturn(Future.successful(Right(log)))
     when(sidecarRepository.updateStatus(sidecarId, SidecarStatus.Terminated)).thenReturn(Future.successful(Right(1)))
 
@@ -123,7 +123,7 @@ class SidecarServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
 
   it should "remove sidecar from SidecarList" in new Setup {
     private val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
-    when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, now, SidecarStatus.Terminated))))
+    when(sidecarLogsRepository.save(any())(any())).thenReturn(Future.successful(Right(SidecarLog(logId, sidecarId, currentInstant, SidecarStatus.Terminated))))
     when(sidecarRepository.updateStatus(sidecarId, SidecarStatus.Terminated)).thenReturn(Future.successful(Right(1)))
 
     await(sidecarService.terminate(sidecar))

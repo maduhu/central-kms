@@ -9,6 +9,7 @@ import org.json4s._
 import org.json4s.ext.JavaTypesSerializers
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheckLevel, HealthCheckStatus}
+import org.leveloneproject.central.kms.domain.inquiries.InquiryStatus
 import org.leveloneproject.central.kms.domain.sidecars.SidecarStatus
 import org.leveloneproject.central.kms.socket._
 
@@ -72,7 +73,14 @@ trait JsonDeserializer extends JsonSerialization with JsonFormats {
 
 object CustomSerializers {
 
-  val defaults = Seq(InstantSerializer, HealthCheckLevelSerializer, HealthCheckStatusSerializer, SidecarStatusSerializer, JsonMessageSerializer)
+  val defaults = Seq(
+    InstantSerializer,
+    HealthCheckLevelSerializer,
+    HealthCheckStatusSerializer,
+    SidecarStatusSerializer,
+    InquiryStatusSerializer,
+    JsonMessageSerializer
+  )
 
   object InstantSerializer extends InstantSerializer(DateTimeFormatter.ISO_INSTANT)
 
@@ -81,6 +89,8 @@ object CustomSerializers {
   object HealthCheckStatusSerializer extends HealthCheckStatusSerializer
 
   object SidecarStatusSerializer extends SidecarStatusSerializer
+
+  object InquiryStatusSerializer extends InquiryStatusSerializer
 
   object JsonMessageSerializer extends JsonMessageSerializer
 
@@ -93,7 +103,7 @@ object CustomSerializers {
 
   class HealthCheckLevelSerializer extends CustomSerializer[HealthCheckLevel](_ ⇒ ( {
     case JString(s) ⇒ s match {
-      case "ping" ⇒ HealthCheckLevel.Ping
+      case HealthCheckLevel.Ping.value ⇒ HealthCheckLevel.Ping
       case _ ⇒ throw new MappingException("")
     }
   }, {
@@ -108,23 +118,34 @@ object CustomSerializers {
   }
   ))
 
-  class SidecarStatusSerializer extends CustomSerializer[SidecarStatus](_ ⇒ (
-    {
-      case JString(s) ⇒ s match {
-        case "registered" ⇒ SidecarStatus.Registered
-        case "terminated" ⇒ SidecarStatus.Terminated
-        case "challenged" ⇒ SidecarStatus.Challenged
-        case "suspended" ⇒ SidecarStatus.Suspended
-      }
-    },
-    {
-      case l: SidecarStatus ⇒ JString(l.value)
+  class SidecarStatusSerializer extends CustomSerializer[SidecarStatus](_ ⇒ ( {
+    case JString(s) ⇒ s match {
+      case SidecarStatus.Registered.value ⇒ SidecarStatus.Registered
+      case SidecarStatus.Terminated.value ⇒ SidecarStatus.Terminated
+      case SidecarStatus.Challenged.value ⇒ SidecarStatus.Challenged
+      case SidecarStatus.Suspended.value ⇒ SidecarStatus.Suspended
     }
+  }, {
+    case l: SidecarStatus ⇒ JString(l.value)
+  }
   ))
+
+  class InquiryStatusSerializer extends CustomSerializer[InquiryStatus](_ ⇒
+    ( {
+      case JString(s) ⇒ s match {
+        case InquiryStatus.Pending.value ⇒ InquiryStatus.Pending
+        case InquiryStatus.Created.value ⇒ InquiryStatus.Created
+        case InquiryStatus.Complete.value ⇒ InquiryStatus.Complete
+      }
+    }, {
+      case i: InquiryStatus ⇒ JString(i.value)
+    }
+    )
+  )
 
   class JsonMessageSerializer extends Serializer[JsonMessage] {
     private val JsonMessageClass = implicitly[Manifest[JsonMessage]].runtimeClass
-    implicit val formats: Formats = (DefaultFormats + HealthCheckLevelSerializer) ++ JavaTypesSerializers.all
+    implicit val formats: Formats = (DefaultFormats + HealthCheckLevelSerializer + InstantSerializer) ++ JavaTypesSerializers.all
 
     def deserialize(implicit format: Formats): PartialFunction[(TypeInfo, JValue), JsonMessage] = deserialize()
 

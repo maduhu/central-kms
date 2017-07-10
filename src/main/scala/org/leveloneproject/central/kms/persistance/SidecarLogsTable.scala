@@ -3,11 +3,8 @@ package org.leveloneproject.central.kms.persistance
 import java.time.Instant
 import java.util.UUID
 
-import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.sidecars.{SidecarLog, SidecarStatus}
 import slick.lifted.ProvenShape
-
-import scala.concurrent.Future
 
 trait SidecarLogsTable extends DataMappers {
   this: DbProfile ⇒
@@ -25,5 +22,8 @@ trait SidecarLogsTable extends DataMappers {
 
   val sidecarLogs: TableQuery[SidecarLogsTable] = TableQuery[SidecarLogsTable]
 }
+
+
+
 
 

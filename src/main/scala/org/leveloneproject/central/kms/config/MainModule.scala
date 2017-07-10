@@ -1,7 +1,6 @@
 package org.leveloneproject.central.kms.config
 
 import java.security.Security
-import java.time.Clock
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
@@ -14,6 +13,7 @@ import org.flywaydb.core.Flyway
 import org.leveloneproject.central.kms.Service
 import org.leveloneproject.central.kms.crypto._
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckRouter
+import org.leveloneproject.central.kms.domain.inquiries.InquiryRouter
 import org.leveloneproject.central.kms.domain.sidecars.{SidecarList, SidecarRouter}
 import org.leveloneproject.central.kms.persistance._
 import org.leveloneproject.central.kms.persistance.postgres._
@@ -37,7 +37,6 @@ class MainModule(config: Config) extends ScalaModule {
     bind[ActorMaterializer].toInstance(materializer)
     bind[SidecarList].in[Singleton]
     bindDatabase
-    bind[Clock].toInstance(Clock.systemUTC())
     bind[KeyStore]
     bind[Flyway]
     bind[Migrator]
@@ -60,6 +59,7 @@ class MainModule(config: Config) extends ScalaModule {
     bind[SidecarRepository].to[PostgresSidecarRepository]
     bind[HealthCheckRepository].to[PostgresHealthCheckRepository]
     bind[SidecarLogsRepository].to[PostgresSidecarLogsRepository]
+    bind[InquiriesRepository].to[PostgresInquiresRepository]
   }
 
   private def bindRouters(): Unit = {
@@ -67,6 +67,7 @@ class MainModule(config: Config) extends ScalaModule {
     routerBinder.addBinding.to[SocketRouter]
     routerBinder.addBinding.to[SidecarRouter]
     routerBinder.addBinding.to[HealthCheckRouter]
+    routerBinder.addBinding.to[InquiryRouter]
   }
 
 }

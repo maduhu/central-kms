@@ -3,28 +3,24 @@ package org.leveloneproject.central.kms.domain.sidecars
 import java.util.UUID
 
 import akka.actor.ActorRef
-import org.leveloneproject.central.kms.domain._
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
 
 class SidecarList {
 
   lazy val sidecars = new mutable.LinkedHashMap[UUID, SidecarAndActor]()
 
-  def current(): Future[Seq[Sidecar]] = Future.successful(sidecars.values.map(_.sidecar).toSeq)
+  def registered(): Seq[Sidecar] = sidecars.values.map(_.sidecar).filter(_.status == SidecarStatus.Registered).toSeq
 
   def register(sidecarWithActor: SidecarAndActor): Unit = sidecars += (sidecarWithActor.sidecar.id → sidecarWithActor)
 
   def unregister(id: UUID): Unit = sidecars -= id
 
-  def actorById(id: UUID): Future[Either[KmsError, ActorRef]] = Future {
-    Try(sidecars(id)) match {
-      case Success(a) ⇒ Right(a.actor)
-      case Failure(_) ⇒ Left(KmsError.unregisteredSidecar(id))
-    }
+  def actorById(id: UUID): Option[ActorRef] = {
+    sidecars.get(id).map(_.actor)
   }
 
+  def byName(name: String): Option[SidecarAndActor] = {
+    sidecars.values.filter(s ⇒ s.serviceName == name && s.status == SidecarStatus.Registered).lastOption
+  }
 }

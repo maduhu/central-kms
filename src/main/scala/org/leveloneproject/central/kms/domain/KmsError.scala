@@ -5,6 +5,8 @@ import java.util.UUID
 case class KmsError(code: Int, message: String, data: Option[Any] = None)
 
 object KmsError {
+  def invalidDateRange = KmsError(2000, "Date range must be greater than 0 and less than 30 days")
+
   def healthCheckDoesNotExist = KmsError(121, "Health check does not exist")
 
 
@@ -22,5 +24,7 @@ object KmsError {
   def methodNotAllowed(method: String) = KmsError(100, s"'$method' method not allowed in current state")
 
   def unregisteredSidecar(id: UUID) = KmsError(1400, "Sidecar '%s' is not registered".format(id))
+
+  def unregisteredSidecar(name: String) = KmsError(1401, s"No current sidecars are registered for service '${name}")
 }
 

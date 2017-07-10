@@ -1,10 +1,12 @@
 package org.leveloneproject.central.kms.sidecar
 
+import java.time.Instant
 import java.util.UUID
 
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.Batch
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
+import org.leveloneproject.central.kms.domain.inquiries.Inquiry
 import org.leveloneproject.central.kms.domain.sidecars.ChallengeResult
 import org.leveloneproject.central.kms.socket.{JsonRequest, JsonResponse}
 
@@ -25,5 +27,12 @@ object Responses {
 
   def commandError(commandId: String, error: AnyRef) = JsonResponse(version, None, Some(error), commandId)
 
+  def inquiryCommand(inquiry: Inquiry) = JsonRequest(version, inquiry.id.toString, "inquiry", Some(InquiryCommandParameters(inquiry)))
+}
+
+case class InquiryCommandParameters(inquiry: UUID, startTime: Instant, endTime: Instant)
+
+object InquiryCommandParameters {
+  def apply(inquiry: Inquiry): InquiryCommandParameters = InquiryCommandParameters(inquiry.id, inquiry.startTime, inquiry.endTime)
 }
 
