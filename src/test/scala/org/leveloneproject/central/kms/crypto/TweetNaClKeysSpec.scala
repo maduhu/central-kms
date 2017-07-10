@@ -26,22 +26,22 @@ class TweetNaClKeysSpec extends FlatSpec with Matchers with AwaitResult {
   }
 
   "verify" should "return true if signature is generated from privateKey" in new VerifierSetup {
-    generator.verify(publicKey, signature, message) shouldBe Right(VerificationResult.Success)
+    generator.verify(publicKey, signature, message) shouldBe VerificationResult.Success
   }
 
   it should "return false if message differs from signature" in new VerifierSetup {
-    generator.verify(publicKey, signature, message + " ") shouldBe Left(VerificationError.InvalidSignature)
+    generator.verify(publicKey, signature, message + " ") shouldBe VerificationResult.InvalidSignature
   }
 
   it should "return false if signature differs from message" in new VerifierSetup {
-    generator.verify(publicKey, signature.replace('A', 'B'), message) shouldBe Left(VerificationError.InvalidSignature)
+    generator.verify(publicKey, signature.replace('A', 'B'), message) shouldBe VerificationResult.InvalidSignature
   }
 
   it should "be able to verify many times" in new VerifierSetup {
-    generator.verify(publicKey, signature, message) shouldBe Right(VerificationResult.Success)
-    generator.verify(publicKey, signature, message + " ") shouldBe Left(VerificationError.InvalidSignature)
-    generator.verify(publicKey, signature.replace('A', 'B'), message) shouldBe Left(VerificationError.InvalidSignature)
-    generator.verify(publicKey, signature, message) shouldBe Right(VerificationResult.Success)
+    generator.verify(publicKey, signature, message) shouldBe VerificationResult.Success
+    generator.verify(publicKey, signature, message + " ") shouldBe VerificationResult.InvalidSignature
+    generator.verify(publicKey, signature.replace('A', 'B'), message) shouldBe VerificationResult.InvalidSignature
+    generator.verify(publicKey, signature, message) shouldBe VerificationResult.Success
   }
 
   it should "verify known signatures" in new Setup {
@@ -56,7 +56,7 @@ class TweetNaClKeysSpec extends FlatSpec with Matchers with AwaitResult {
     val message: Array[Byte] = splits(2).fromHex
     val sig: Array[Byte] = splits(3).fromHex
 
-    generator.verify(publicKey, sig, message) shouldBe Right(VerificationResult.Success)
+    generator.verify(publicKey, sig, message) shouldBe VerificationResult.Success
   }
 
 }

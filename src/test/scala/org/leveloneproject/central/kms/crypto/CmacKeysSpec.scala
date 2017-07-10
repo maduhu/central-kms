@@ -26,14 +26,14 @@ class CmacKeysSpec extends FlatSpec with Matchers with AwaitResult {
   }
 
   "verify" should "verify valid signature" in new VerifySetup {
-    keys.verify(key, signature, message) shouldBe Right(VerificationResult.Success)
+    keys.verify(key, signature, message) shouldBe VerificationResult.Success
   }
 
   it should "return left if signature is not right length" in new VerifySetup {
-    keys.verify(key, signature + signature, message) shouldBe Left(VerificationError.InvalidSignature)
+    keys.verify(key, signature + signature, message) shouldBe VerificationResult.InvalidSignature
   }
 
   it should "return InvalidSignature if key is not hex" in new VerifySetup {
-    keys.verify("01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ", signature, message) shouldBe Left(VerificationError.InvalidKey)
+    keys.verify("01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ", signature, message) shouldBe VerificationResult.InvalidKey
   }
 }

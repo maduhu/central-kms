@@ -8,7 +8,7 @@ class FutureEither[L, R](val future: Future[Either[L, R]]) {
   def flatMap[R2](block: R ⇒ FutureEither[L, R2]): FutureEither[L, R2] = {
     val result = future.flatMap {
       case Right(r) ⇒ block(r).future
-      case Left(l) ⇒ Future.successful(Left(l))
+      case Left(l) ⇒ Future(Left(l))
     }
     new FutureEither(result)
   }

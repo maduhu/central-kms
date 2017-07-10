@@ -18,6 +18,7 @@ import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with MockitoSugar {
@@ -36,41 +37,35 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     final val privateKey = "some private key"
     final val symmetricKey = "symmetric key"
 
-    def setupRegistration(): Sidecar = {
-      val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, symmetricKey)
-      val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
-      when(sidecarActions.registerSidecar(RegisterParameters(sidecarId, serviceName))).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
-      sidecar
-    }
+  }
 
-    def connectSidecar(): Unit = {
-      sidecarActor ! Connected(out.ref)
-      out.expectNoMsg(defaultTimeout)
-    }
+  trait ConnectedSidecar {
+    this: Setup ⇒
 
-    def registerSidecar(): Unit = {
-      sidecarActor ! Register(commandId, RegisterParameters(sidecarId, serviceName))
-    }
+    sidecarActor ! Connected(out.ref)
+    out.expectNoMsg(defaultTimeout)
+  }
 
-    def connectAndRegisterSidecar(): Sidecar = {
-      connectSidecar()
-      registerSidecar()
-      expectRegistrationResponse()
-    }
+  trait ChallengedSidecar extends ConnectedSidecar {
+    this: Setup ⇒
 
-    def acceptChallenge(sidecar: Sidecar): Unit = {
+    val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, symmetricKey)
+    when(sidecarActions.registerSidecar(RegisterParameters(sidecarId, serviceName)))
+      .thenReturn(Future(Right(RegisterResponse(Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString), keyResponse))))
+    val registerCommand = Register(commandId, RegisterParameters(sidecarId, serviceName))
+    sidecarActor ! registerCommand
+    out.expectMsg(Responses.sidecarRegistered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey, challengeString)))
+    val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
+  }
 
-      when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future.successful(Right(SidecarAndActor(sidecar, sidecarActor))))
-      val commandId = UUID.randomUUID().toString
-      sidecarActor ! Challenge(commandId, ChallengeAnswer("", ""))
+  trait RegisteredSidecar extends ChallengedSidecar {
+    this: Setup ⇒
 
-      out.expectMsg(Responses.challengeAccepted(commandId, ChallengeResult.success))
-    }
+    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future(Right(SidecarAndActor(sidecar, sidecarActor))))
+    val challengeCommandId: String = UUID.randomUUID().toString
+    sidecarActor ! Challenge(challengeCommandId, ChallengeAnswer("", ""))
 
-    def expectRegistrationResponse(): Sidecar = {
-      out.expectMsg(Responses.sidecarRegistered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey, challengeString)))
-      Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challengeString)
-    }
+    out.expectMsg(Responses.challengeAccepted(challengeCommandId, ChallengeResult.success))
   }
 
   "initial" should "not respond to register command when not connected" in new Setup {
@@ -79,127 +74,90 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     out.expectNoMsg(defaultTimeout)
   }
 
-  it should "accept Connected message" in new Setup {
-    connectSidecar()
+  it should "accept Connected message" in new Setup with ConnectedSidecar {
   }
 
-  "when connected" should "stop self on Disconnect command" in new Setup {
-    connectSidecar()
+  "when connected" should "stop self on Disconnect command" in new Setup with ConnectedSidecar {
 
     sidecarActor ! Disconnect
 
     sidecarActor.underlying.isTerminated shouldBe true
   }
 
-  it should "send responses to out" in new Setup {
-    connectSidecar()
-
+  it should "send responses to out" in new Setup with ConnectedSidecar{
     private val response = Responses.commandError(commandId, KmsError.parseError)
     sidecarActor ! response
 
     out.expectMsg(response)
   }
 
-  it should "send error to out when registration fails" in new Setup {
+  it should "send error to out when registration fails" in new Setup with ConnectedSidecar {
     val error = KmsError(500, "some message")
-    when(sidecarActions.registerSidecar(RegisterParameters(sidecarId, serviceName))).thenReturn(Future.successful(Left(error)))
-    connectSidecar()
-    registerSidecar()
+    when(sidecarActions.registerSidecar(RegisterParameters(sidecarId, serviceName))).thenReturn(Future(Left(error)))
+    sidecarActor ! Register(commandId, RegisterParameters(sidecarId, serviceName))
     out.expectMsg(Responses.commandError(commandId, error))
   }
 
-  it should "send registered to out when registering" in new Setup {
-    setupRegistration()
-    connectAndRegisterSidecar()
+  it should "send registered to out when registering" in new Setup with ChallengedSidecar {
+
   }
 
-  it should "send method not allowed to out when registering twice" in new Setup {
-    setupRegistration()
-
-    connectAndRegisterSidecar()
-    registerSidecar()
+  it should "send method not allowed to out when registering twice" in new Setup with ChallengedSidecar {
+    sidecarActor ! registerCommand
     out.expectMsg(JsonResponse("2.0", None, Some(KmsError.methodNotAllowed("register")), commandId))
   }
 
-  it should "send duplicate sidecar registered error to out" in new Setup {
+  it should "send duplicate sidecar registered error to out" in new Setup with ConnectedSidecar {
     private val exists = KmsError.sidecarExistsError(sidecarId)
-    when(sidecarActions.registerSidecar(any())).thenReturn(Future.successful(Left(exists)))
-    connectSidecar()
-    registerSidecar()
+    when(sidecarActions.registerSidecar(any())).thenReturn(Future(Left(exists)))
+    sidecarActor ! Register(commandId, RegisterParameters(sidecarId, serviceName))
     out.expectMsg(Responses.commandError(commandId, exists))
   }
 
-  "when challenged" should "not respond to batch commands" in new Setup {
-    setupRegistration()
-    connectAndRegisterSidecar()
-
+  "when challenged" should "not respond to batch commands" in new Setup with ChallengedSidecar {
     private val command = SaveBatch(commandId, SaveBatchParameters(UUID.randomUUID(), "signature"))
     sidecarActor ! command
 
     out.expectMsg(Responses.methodNotAllowed(command))
   }
 
-  it should "send responses to out" in new Setup {
-    connectSidecar()
-
+  it should "send responses to out" in new Setup with ConnectedSidecar {
     private val response = Responses.commandError(commandId, KmsError.parseError)
     sidecarActor ! response
 
     out.expectMsg(response)
   }
 
-  it should "send challenge response on registration request" in new Setup {
-    setupRegistration()
-    connectSidecar()
-    registerSidecar()
-
-    out.expectMsg(Responses.sidecarRegistered(commandId, RegisteredResult(sidecarId, privateKey, symmetricKey, challengeString)))
-  }
-
-  it should "send error to socket if challenge fails" in new Setup {
-    setupRegistration()
-    connectAndRegisterSidecar()
-
+  it should "send error to socket if challenge fails" in new Setup with ChallengedSidecar {
     private val challengeError = ChallengeError.invalidRowSignature
-    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future.successful(Left(challengeError)))
+    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future(Left(challengeError)))
 
     sidecarActor ! Challenge(commandId, ChallengeAnswer("", ""))
     out.expectMsg(Responses.commandError(commandId, challengeError))
   }
 
-  it should "respond ok to challenge command" in new Setup {
-    setupRegistration()
-    private val sidecar = connectAndRegisterSidecar()
-
-    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future.successful(Right(SidecarAndActor(sidecar, sidecarActor))))
+  it should "respond ok to challenge command" in new Setup with ChallengedSidecar {
+    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future(Right(SidecarAndActor(sidecar, sidecarActor))))
 
     sidecarActor ! Challenge(commandId, ChallengeAnswer("batchSignature", "rowSignature"))
 
     out.expectMsg(Responses.challengeAccepted(commandId, ChallengeResult.success))
   }
 
-  "when registered" should "save batch when registered and send batch to out" in new Setup {
-    private val sidecar = setupRegistration()
-    connectAndRegisterSidecar()
-    acceptChallenge(sidecar)
-
+  "when registered" should "save batch when registered and send batch to out" in new Setup with RegisteredSidecar {
     private val batchId = UUID.randomUUID()
     private val signature = "signature"
 
     private val batch = Batch(batchId, sidecarId, signature, Instant.now())
     private val parameters = SaveBatchParameters(batchId, signature)
     when(sidecarActions.createBatch(sidecar, parameters))
-      .thenReturn(Future.successful(Right(batch)))
+      .thenReturn(Future(Right(batch)))
 
     sidecarActor ! SaveBatch(commandId, parameters)
     out.expectMsg(Responses.batchCreated(commandId, batch))
   }
 
-  it should "send health check request to web socket" in new Setup {
-    private val sidecar = setupRegistration()
-    connectAndRegisterSidecar()
-    acceptChallenge(sidecar)
-
+  it should "send health check request to web socket" in new Setup with RegisteredSidecar {
     private val healthCheckId = UUID.randomUUID()
     private val healthCheckLevel = HealthCheckLevel.Ping
     private val healthCheck = HealthCheck(healthCheckId, sidecarId, healthCheckLevel, Instant.now(), HealthCheckStatus.Pending)
@@ -209,27 +167,36 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
     out.expectMsg(Responses.healthCheckRequest(healthCheck))
   }
 
-  it should "terminate sidecar and stop self when disconnected" in new Setup {
-    private val sidecar = setupRegistration()
-    connectAndRegisterSidecar()
-    acceptChallenge(sidecar)
-
-    when(sidecarActions.terminateSidecar(sidecar)).thenReturn(Future.successful(Right(sidecar)))
+  it should "terminate sidecar and stop self when disconnected" in new Setup with RegisteredSidecar {
+    when(sidecarActions.terminateSidecar(sidecar)).thenReturn(Future(Right(sidecar)))
 
     sidecarActor ! Disconnect
     sidecarActor.underlying.isTerminated shouldBe true
   }
 
-  it should "send inquiry command to socket" in new Setup {
-    private val sidecar = setupRegistration()
-    connectAndRegisterSidecar()
-    acceptChallenge(sidecar)
+  it should "send inquiry command to socket" in new Setup with RegisteredSidecar {
     private val now = Instant.now()
 
     private val inquiry = Inquiry(UUID.randomUUID(), serviceName, now, now, now, InquiryStatus.Created, sidecarId)
     sidecarActor ! inquiry
     out.expectMsg(Responses.inquiryCommand(inquiry))
   }
-}
 
-case class SomeCommand(id: String) extends Command("some name")
+  "InquiryReply" should "be returned as invalid command when connected" in new Setup with ConnectedSidecar {
+    sidecarActor ! InquiryReply(commandId, mock[InquiryReplyParameters])
+    out.expectMsg(Responses.commandError(commandId, KmsError.methodNotAllowed("inquiry-response")))
+  }
+
+  it should "be returned as method not allowed when challenged" in new Setup with ChallengedSidecar {
+    sidecarActor ! InquiryReply(commandId, mock[InquiryReplyParameters])
+    out.expectMsg(Responses.commandError(commandId, KmsError.methodNotAllowed("inquiry-response")))
+  }
+
+  it should "not send anything to socket when complete" in new Setup with RegisteredSidecar {
+    private val params = mock[InquiryReplyParameters]
+    when(sidecarActions.inquiryResponse(sidecar,params)).thenReturn(Future((): Unit))
+    sidecarActor ! InquiryReply(commandId, params)
+    out.expectNoMsg(defaultTimeout)
+    verify(sidecarActions, times(1)).inquiryResponse(sidecar, params)
+  }
+}

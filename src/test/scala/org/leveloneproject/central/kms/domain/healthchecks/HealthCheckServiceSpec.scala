@@ -9,7 +9,6 @@ import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckLevel.Ping
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckStatus.Pending
 import org.leveloneproject.central.kms.domain.sidecars.SidecarList
-import org.leveloneproject.central.kms.persistance.HealthCheckRepository
 import org.leveloneproject.central.kms.util.{IdGenerator, InstantProvider}
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.Mockito._
@@ -21,12 +20,12 @@ import scala.concurrent.Future
 class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with MockitoSugar with AwaitResult {
 
   trait Setup {
-    final val healthCheckRepo: HealthCheckRepository = mock[HealthCheckRepository]
+    final val store: HealthCheckStore = mock[HealthCheckStore]
     final val currentInstant: Instant = Instant.now()
     final val sidecarList: SidecarList = mock[SidecarList]
     final val healthCheckId: UUID = UUID.randomUUID()
 
-    val service: HealthCheckService = new HealthCheckService(healthCheckRepo, sidecarList) with IdGenerator with InstantProvider {
+    val service: HealthCheckService = new HealthCheckService(store, sidecarList) with IdGenerator with InstantProvider {
       override def newId(): UUID = healthCheckId
 
       override def now(): Instant = currentInstant
@@ -42,11 +41,11 @@ class HealthCheckServiceSpec extends FlatSpec with AkkaSpec with Matchers with M
 
     private val sidecarProbe = TestProbe()
     when(sidecarList.actorById(sidecarId)).thenReturn(Some(sidecarProbe.ref))
-    when(healthCheckRepo.insert(check)).thenReturn(Future.successful(check))
+    when(store.create(check)).thenReturn(Future(check))
 
     await(service.create(request)) shouldBe Right(check)
 
-    verify(healthCheckRepo, times(1)).insert(check)
+    verify(store, times(1)).create(check)
     sidecarProbe.expectMsg(check)
   }
 

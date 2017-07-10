@@ -101,4 +101,16 @@ class InputConverterSpec extends FlatSpec with Matchers with MessageBuilder {
 
     converter.fromMessage(message) shouldBe Challenge(commandId, ChallengeAnswer(batchSignature, rowSignature))
   }
+
+  "inquiry-response" should "convert inquiry-response to InquiryReply command" in new Setup {
+    private val commandId = UUID.randomUUID().toString
+    private val inquiryId = UUID.randomUUID()
+    private val batchId = UUID.randomUUID()
+    private val total = 10
+    private val item = 3
+    private val body = UUID.randomUUID().toString
+
+    val message = TextMessage(s"""{"jsonrpc":"2.0","id":"$commandId","method":"inquiry-response","params":{"id":"$batchId","inquiry":"$inquiryId","body":"$body","total":$total,"item":$item}}""")
+    converter.fromMessage(message) shouldBe InquiryReply(commandId, InquiryReplyParameters(batchId, body, inquiryId, total, item))
+  }
 }

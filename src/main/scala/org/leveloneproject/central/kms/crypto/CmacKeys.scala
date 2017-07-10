@@ -21,23 +21,23 @@ class CmacKeys extends SymmetricKeyGenerator with SymmetricVerifier {
     generator.generateKey().getEncoded.toHex
   }
 
-  def verify(key: String, signature: String, message: String): Either[VerificationError, VerificationResult] = {
-    for {
+  def verify(key: String, signature: String, message: String): VerificationResult = {
+    (for {
       mac ← getMac(key)
       hash ← hash(message, mac)
       result ← compare(hash, signature)
-    } yield result
+    } yield result).merge
   }
 
-  private def compare(hash: Array[Byte], signature: String): Either[VerificationError, VerificationResult] = {
+  private def compare(hash: Array[Byte], signature: String): Either[VerificationResult, VerificationResult] = {
     if (hash.deep == signature.fromHex.deep) {
       Right(VerificationResult.Success)
     } else {
-      Left(VerificationError.InvalidSignature)
+      Left(VerificationResult.InvalidSignature)
     }
   }
 
-  private def hash(message: String, mac: Mac): Either[VerificationError, Array[Byte]] = {
+  private def hash(message: String, mac: Mac): Either[VerificationResult, Array[Byte]] = {
     try {
       val messageBytes = message.getBytes
       mac.update(messageBytes, 0, messageBytes.length)
@@ -45,18 +45,18 @@ class CmacKeys extends SymmetricKeyGenerator with SymmetricVerifier {
       mac.doFinal(out, 0)
       Right(out)
     } catch {
-      case _: Throwable ⇒ Left(VerificationError.InvalidSignature)
+      case _: Throwable ⇒ Left(VerificationResult.InvalidSignature)
     }
   }
 
-  private def getMac(key: String): Either[VerificationError, Mac] = {
+  private def getMac(key: String): Either[VerificationResult, Mac] = {
     try {
       val mac = Mac.getInstance(hashAlgorithm, BouncyCastleProvider.PROVIDER_NAME)
       val keySpec = new SecretKeySpec(key.fromHex, keyAlgorithm)
       mac.init(keySpec)
       Right(mac)
     } catch {
-      case _: Throwable ⇒ Left(VerificationError.InvalidKey)
+      case _: Throwable ⇒ Left(VerificationResult.InvalidKey)
     }
   }
 }

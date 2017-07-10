@@ -10,6 +10,7 @@ case class Inquiry(
                     endTime: Instant,
                     created: Instant,
                     status: InquiryStatus,
-                    issued_to: UUID,
-                    total: Int = 0
+                    issuedTo: UUID,
+                    total: Int = 0,
+                    responseCount: Int = 0
                   )

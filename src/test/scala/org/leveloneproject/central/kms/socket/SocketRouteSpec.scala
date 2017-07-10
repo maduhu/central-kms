@@ -12,7 +12,6 @@ import org.leveloneproject.central.kms.sidecar.{SaveBatchParameters, SidecarActi
 import org.leveloneproject.central.kms.utils.MessageBuilder
 import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito._
-import org.mockito.invocation.InvocationOnMock
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -33,8 +32,8 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     def setupRegistration(): Sidecar = {
       val keyResponse = CreateKeyResponse(sidecarId, publicKey, privateKey, rowKey)
       val sidecar = Sidecar(sidecarId, serviceName, SidecarStatus.Challenged, challenge)
-      when(sidecarActions.registerSidecar(any())).thenReturn(Future.successful(Right(RegisterResponse(sidecar, keyResponse))))
-      when(sidecarActions.challenge(any(), any(), any())).thenAnswer((invocation: InvocationOnMock) => Future.successful(Right(invocation.getArgument[SidecarAndActor](0))))
+      when(sidecarActions.registerSidecar(any())).thenReturn(Future(Right(RegisterResponse(sidecar, keyResponse))))
+      when(sidecarActions.challenge(any(), any(), any())).thenAnswer(i ⇒ Future(Right(i.getArgument[SidecarAndActor](0))))
       sidecar
     }
   }
@@ -85,7 +84,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
     private val batchId = UUID.randomUUID()
     private val signature = "some signature"
     val socketRouter = new SocketRouter(webSocketService)
-    when(sidecarActions.createBatch(sidecar, SaveBatchParameters(batchId, signature))).thenReturn(Future.successful(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
+    when(sidecarActions.createBatch(sidecar, SaveBatchParameters(batchId, signature))).thenReturn(Future(Right(Batch(batchId, sidecarId, signature, Instant.now()))))
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {
       wsClient.sendMessage(registerRequest("register1", sidecarId, serviceName))
@@ -99,9 +98,9 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
 
   it should "terminate client on challenge failure" in new Setup {
     private val challengeRequestId = UUID.randomUUID.toString
-    private val sidecar = setupRegistration()
+    setupRegistration()
     private val invalidRowSignature = ChallengeError.invalidRowSignature
-    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future.successful(Left(invalidRowSignature)))
+    when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future(Left(invalidRowSignature)))
     val socketRouter = new SocketRouter(webSocketService)
     val wsClient = WSProbe()
     WS("/sidecar", wsClient.flow) ~> socketRouter.route ~> check {

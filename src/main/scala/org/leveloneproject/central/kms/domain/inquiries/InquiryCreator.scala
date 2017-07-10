@@ -6,13 +6,18 @@ import java.time.temporal.ChronoUnit
 import com.google.inject.Inject
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.sidecars.{SidecarAndActor, SidecarList}
-import org.leveloneproject.central.kms.persistance.InquiriesRepository
 import org.leveloneproject.central.kms.util.{FutureEither, IdGenerator, InstantProvider}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class InquiryService @Inject()(sidecarList: SidecarList, inquiriesRepository: InquiriesRepository) extends IdGenerator with InstantProvider {
+sealed case class CreateInquiryRequest(service: String, startTime: Instant, endTime: Instant)
+
+sealed trait InquiryCreator {
+  def create(request: CreateInquiryRequest): Future[Either[KmsError, Inquiry]]
+}
+
+class InquiryCreatorImpl @Inject()(sidecarList: SidecarList, store: InquiriesStore) extends InquiryCreator with IdGenerator with InstantProvider {
 
   def create(request: CreateInquiryRequest): Future[Either[KmsError, Inquiry]] = {
     for {
@@ -22,7 +27,7 @@ class InquiryService @Inject()(sidecarList: SidecarList, inquiriesRepository: In
   }
 
   private def createAndSave(request: CreateInquiryRequest, sidecarAndActor: SidecarAndActor): FutureEither[KmsError, Inquiry] = {
-    inquiriesRepository.insert(Inquiry(newId(), request.service, request.startTime, request.endTime, now(), InquiryStatus.Created, sidecarAndActor.id)) map { inquiry ⇒
+    store.insert(Inquiry(newId(), request.service, request.startTime, request.endTime, now(), InquiryStatus.Created, sidecarAndActor.id)) map { inquiry ⇒
       sidecarAndActor.actor ! inquiry
       Right(inquiry)
     }

@@ -1,5 +1,5 @@
 package org.leveloneproject.central.kms.crypto
 
 trait AsymmetricVerifier {
-  def verify(publicKey: String, signature: String, message: String): Either[VerificationError, VerificationResult]
+  def verify(publicKey: String, signature: String, message: String): VerificationResult
 }

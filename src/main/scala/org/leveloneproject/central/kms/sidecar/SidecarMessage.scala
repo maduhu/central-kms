@@ -24,12 +24,17 @@ trait SidecarMessageParser extends JsonDeserializer {
       case "register" ⇒ register(request)
       case "batch" ⇒ saveBatch(request)
       case "challenge" ⇒ challenge(request)
+      case "inquiry-response" ⇒ inquiryReply(request)
       case _ ⇒ Left(Responses.commandError(request.id, KmsError.methodNotFound))
     }
   }
 
   private def challenge(request: JsonRequest): Either[JsonResponse, Challenge] = {
     extractParameters[ChallengeAnswer](request).map(Challenge(request.id, _))
+  }
+
+  private def inquiryReply(request: JsonRequest): Either[JsonResponse, InquiryReply] = {
+    extractParameters[InquiryReplyParameters](request).map(InquiryReply(request.id, _))
   }
 
   private def saveBatch(request: JsonRequest): Either[JsonResponse, SaveBatch] = {
@@ -67,3 +72,6 @@ case class CompleteRequest(request: JsonResponse) extends SidecarMessage
 case class Connected(socket: ActorRef) extends SidecarMessage
 
 case class Disconnect() extends SidecarMessage
+
+case class InquiryReply(id: String, params: InquiryReplyParameters) extends Command("inquiry-response")
+case class InquiryReplyParameters(id: UUID, body: String, inquiry: UUID, total: Int, item: Int)

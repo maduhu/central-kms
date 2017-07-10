@@ -13,13 +13,17 @@ class ChallengeVerifier @Inject()(asymmetricVerifier: AsymmetricVerifier, symmet
   }
 
   private def verifyBatchSignature(challenge: String, variables: ChallengeKeys, answer: ChallengeAnswer): Either[KmsError, VerificationResult] = {
-    asymmetricVerifier.verify(variables.publicKey, answer.batchSignature, challenge)
-      .fold(_ ⇒ Left(ChallengeError.invalidBatchSignature), r ⇒ Right(r))
+    asymmetricVerifier.verify(variables.publicKey, answer.batchSignature, challenge) match {
+      case r@VerificationResult(true, _) ⇒ Right(r)
+      case VerificationResult(false, _) ⇒ Left(ChallengeError.invalidBatchSignature)
+    }
   }
 
   private def verifyRowSignature(challenge: String, variables: ChallengeKeys, answer: ChallengeAnswer): Either[KmsError, VerificationResult] = {
-    symmetricVerifier.verify(variables.symmetricKey, answer.rowSignature, challenge)
-      .fold(_ ⇒ Left(ChallengeError.invalidRowSignature), result ⇒ Right(result))
+    symmetricVerifier.verify(variables.symmetricKey, answer.rowSignature, challenge) match {
+      case r@VerificationResult(true, _) ⇒ Right(r)
+      case VerificationResult(false, _) ⇒ Left(ChallengeError.invalidRowSignature)
+    }
   }
 }
 

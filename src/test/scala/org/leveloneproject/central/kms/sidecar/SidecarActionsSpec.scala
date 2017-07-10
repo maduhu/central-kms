@@ -4,15 +4,15 @@ import java.util.UUID
 
 import akka.testkit.TestProbe
 import org.leveloneproject.central.kms.AwaitResult
-import org.leveloneproject.central.kms.domain.batches.BatchService
+import org.leveloneproject.central.kms.domain.batches.BatchCreatorImpl
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckService
+import org.leveloneproject.central.kms.domain.inquiries.InquiryResponseVerifier
 import org.leveloneproject.central.kms.domain.sidecars._
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.Mockito._
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class SidecarActionsSpec extends FlatSpec with Matchers with MockitoSugar with AkkaSpec with AwaitResult {
@@ -20,7 +20,8 @@ class SidecarActionsSpec extends FlatSpec with Matchers with MockitoSugar with A
   trait Setup {
     val challengeVerifier: ChallengeVerifier = mock[ChallengeVerifier]
     val sidecarService: SidecarService = mock[SidecarService]
-    val actions = new SidecarActions(mock[BatchService], sidecarService, mock[HealthCheckService], challengeVerifier)
+    val inquiryResponseVerifier: InquiryResponseVerifier = mock[InquiryResponseVerifier]
+    val actions = new SidecarActions(mock[BatchCreatorImpl], sidecarService, mock[HealthCheckService], challengeVerifier, inquiryResponseVerifier)
     val challenge: String = randomString
     val keys = ChallengeKeys(randomString, randomString)
     val answer = ChallengeAnswer(randomString, randomString)
@@ -29,7 +30,7 @@ class SidecarActionsSpec extends FlatSpec with Matchers with MockitoSugar with A
 
   "challenge" should "accept challenge if verification passes" in new Setup {
     when(challengeVerifier.verify(challenge, keys, answer)).thenReturn(Right(ChallengeResult.success))
-    when(sidecarService.challengeAccepted(sidecarAndActor)).thenReturn(Future.successful(Right(sidecarAndActor)))
+    when(sidecarService.challengeAccepted(sidecarAndActor)).thenReturn(Future(Right(sidecarAndActor)))
     private val result = await(actions.challenge(sidecarAndActor, keys, answer))
     result shouldBe Right(sidecarAndActor)
     verify(sidecarService, times(1)).challengeAccepted(sidecarAndActor)
@@ -39,7 +40,7 @@ class SidecarActionsSpec extends FlatSpec with Matchers with MockitoSugar with A
   it should "return error if verification fails" in new Setup {
     private val invalidRowSignature = ChallengeError.invalidRowSignature
     when(challengeVerifier.verify(challenge, keys, answer)).thenReturn(Left(invalidRowSignature))
-    when(sidecarService.suspend(sidecarAndActor.sidecar, invalidRowSignature.message)).thenReturn(Future.successful(Right(sidecarAndActor.sidecar)))
+    when(sidecarService.suspend(sidecarAndActor.sidecar, invalidRowSignature.message)).thenReturn(Future(Right(sidecarAndActor.sidecar)))
 
     await(actions.challenge(sidecarAndActor, keys, answer)) shouldBe Left(invalidRowSignature)
 

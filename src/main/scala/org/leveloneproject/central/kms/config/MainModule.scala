@@ -12,9 +12,11 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.flywaydb.core.Flyway
 import org.leveloneproject.central.kms.Service
 import org.leveloneproject.central.kms.crypto._
-import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckRouter
-import org.leveloneproject.central.kms.domain.inquiries.InquiryRouter
-import org.leveloneproject.central.kms.domain.sidecars.{SidecarList, SidecarRouter}
+import org.leveloneproject.central.kms.domain.batches.{BatchFinder, BatchFinderImpl, BatchStore}
+import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheckRouter, HealthCheckStore}
+import org.leveloneproject.central.kms.domain.inquiries._
+import org.leveloneproject.central.kms.domain.keys._
+import org.leveloneproject.central.kms.domain.sidecars.{SidecarList, SidecarLogsStore, SidecarRouter, SidecarStore}
 import org.leveloneproject.central.kms.persistance._
 import org.leveloneproject.central.kms.persistance.postgres._
 import org.leveloneproject.central.kms.routing.{RouteAggregator, Router}
@@ -37,7 +39,7 @@ class MainModule(config: Config) extends ScalaModule {
     bind[ActorMaterializer].toInstance(materializer)
     bind[SidecarList].in[Singleton]
     bindDatabase
-    bind[KeyStore]
+    bind[InquiryCreator].to[InquiryCreatorImpl]
     bind[Flyway]
     bind[Migrator]
     bind[Service]
@@ -45,6 +47,10 @@ class MainModule(config: Config) extends ScalaModule {
     bind[SymmetricKeyGenerator].toInstance(symmetric)
     bind[AsymmetricVerifier].toInstance(asymmetric)
     bind[SymmetricVerifier].toInstance(symmetric)
+    bind[BatchFinder].to[BatchFinderImpl]
+    bind[KeyVerifier].to[KeyVerifierImpl]
+    bind[KeyFinder].to[KeyFinderImpl]
+    bind[InquiryResponseVerifier].to[InquiryResponseVerifierImpl]
     bind[RouteAggregator]
     bind[WebSocketService]
 
@@ -54,12 +60,13 @@ class MainModule(config: Config) extends ScalaModule {
 
   private def bindDatabase = {
     bind[DbProvider].to[PostgresDbProvider].in[Singleton]
-    bind[BatchRepository].to[PostgresBatchRepository]
-    bind[KeyRepository].to[PostgresKeyRepository]
-    bind[SidecarRepository].to[PostgresSidecarRepository]
-    bind[HealthCheckRepository].to[PostgresHealthCheckRepository]
-    bind[SidecarLogsRepository].to[PostgresSidecarLogsRepository]
-    bind[InquiriesRepository].to[PostgresInquiresRepository]
+    bind[BatchStore].to[PostgresBatchStore]
+    bind[KeyStore].to[PostgresKeyStore]
+    bind[SidecarStore].to[PostgresSidecarStore]
+    bind[HealthCheckStore].to[PostgresHealthCheckStore]
+    bind[SidecarLogsStore].to[PostgresSidecarLogsStore]
+    bind[InquiriesStore].to[PostgresInquiriesStore]
+    bind[InquiryResponsesStore].to[PostgresInquiryResponsesStore]
   }
 
   private def bindRouters(): Unit = {

@@ -13,15 +13,27 @@ trait InquiriesTable extends DataMappers {
 
   class InquiresTable(tag: Tag) extends Table[Inquiry](tag, "inquiries") {
     def id: Rep[UUID] = column[UUID]("id")
+
     def service: Rep[String] = column[String]("service")
+
     def startTime: Rep[Instant] = column[Instant]("start_time")
+
     def endTime: Rep[Instant] = column[Instant]("end_time")
+
     def created: Rep[Instant] = column[Instant]("created")
+
     def status: Rep[InquiryStatus] = column[InquiryStatus]("status")
+
     def issuedTo: Rep[UUID] = column[UUID]("issued_to")
+
     def total: Rep[Int] = column[Int]("total")
-    def * : ProvenShape[Inquiry] = (id, service, startTime, endTime, created, status, issuedTo, total) <> (Inquiry.tupled, Inquiry.unapply)
+
+    def responseCount: Rep[Int] = column[Int]("response_count")
+
+    def * : ProvenShape[Inquiry] = (id, service, startTime, endTime, created, status, issuedTo, total, responseCount) <> (Inquiry.tupled, Inquiry.unapply)
   }
 
   val inquiries: TableQuery[InquiresTable] = TableQuery[InquiresTable]
 }
+
+

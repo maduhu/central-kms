@@ -50,6 +50,8 @@ class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerial
       sidecarActions.createBatch(sidecarAndOutSocket, params).map {
         _.fold(e ⇒ commandError(id, e), batch ⇒ batchCreated(id, batch))
       }.map { result ⇒ sidecarAndOutSocket.out ! result }
+
+    case InquiryReply(_, params) ⇒ sidecarActions.inquiryResponse(sidecarAndOutSocket, params)
     case healthCheck: HealthCheck ⇒ request(sidecarAndOutSocket, healthCheckRequest(healthCheck), completeHealthCheck)
     case inquiry: Inquiry ⇒ sidecarAndOutSocket.out ! inquiryCommand(inquiry)
     case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)

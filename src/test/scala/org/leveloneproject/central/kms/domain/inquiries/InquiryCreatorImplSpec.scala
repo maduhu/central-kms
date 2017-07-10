@@ -8,7 +8,6 @@ import akka.testkit.TestProbe
 import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.sidecars.{Sidecar, SidecarAndActor, SidecarList, SidecarStatus}
-import org.leveloneproject.central.kms.persistance.InquiriesRepository
 import org.leveloneproject.central.kms.util.{IdGenerator, InstantProvider}
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.Mockito._
@@ -17,14 +16,14 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.Future
 
-class InquiryServiceSpec extends FlatSpec with Matchers with MockitoSugar with AwaitResult with AkkaSpec {
+class InquiryCreatorImplSpec extends FlatSpec with Matchers with MockitoSugar with AwaitResult with AkkaSpec {
 
   trait Setup {
-    val repo: InquiriesRepository = mock[InquiriesRepository]
+    val store: InquiriesStore = mock[InquiriesStore]
     val sidecarList: SidecarList = mock[SidecarList]
     val id: UUID = UUID.randomUUID()
     val newInstant: Instant = Instant.now()
-    val service = new InquiryService(sidecarList, repo) with InstantProvider with IdGenerator {
+    val creator = new InquiryCreatorImpl(sidecarList, store) with InstantProvider with IdGenerator {
       override def now(): Instant = newInstant
 
       override def newId(): UUID = id
@@ -36,7 +35,7 @@ class InquiryServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     private val startTime = endTime.minus(31, ChronoUnit.DAYS)
     private val request = CreateInquiryRequest("serviceName", startTime, endTime)
 
-    await(service.create(request)) shouldBe Left(KmsError.invalidDateRange)
+    await(creator.create(request)) shouldBe Left(KmsError.invalidDateRange)
   }
 
   it should "return error if startTime is after endTime" in new Setup {
@@ -44,14 +43,14 @@ class InquiryServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     private val startTime = endTime.plusSeconds(1)
     private val request = CreateInquiryRequest("serviceName", startTime, endTime)
 
-    await(service.create(request)) shouldBe Left(KmsError.invalidDateRange)
+    await(creator.create(request)) shouldBe Left(KmsError.invalidDateRange)
   }
 
   it should "return error if service is not currently registered" in new Setup {
     private val name = "serviceName"
     when(sidecarList.byName(name)).thenReturn(None)
     private val request = CreateInquiryRequest(name, newInstant.minusSeconds(1), newInstant)
-    await(service.create(request)) shouldBe Left(KmsError.unregisteredSidecar(name))
+    await(creator.create(request)) shouldBe Left(KmsError.unregisteredSidecar(name))
   }
 
   it should "create and return new inquiry" in new Setup {
@@ -62,12 +61,12 @@ class InquiryServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     private val sidecarId = UUID.randomUUID
     when(sidecarList.byName(serviceName)).thenReturn(Some(SidecarAndActor(Sidecar(sidecarId, serviceName, SidecarStatus.Registered, ""), TestProbe().ref)))
     private val inquiry = Inquiry(id, serviceName, startTime, endTime, newInstant, InquiryStatus.Created, sidecarId)
-    when(repo.insert(inquiry)).thenReturn(Future.successful(inquiry))
+    when(store.insert(inquiry)).thenReturn(Future(inquiry))
 
-    private val result = await(service.create(request))
+    private val result = await(creator.create(request))
 
     result shouldBe Right(inquiry)
-    verify(repo, times(1)).insert(inquiry)
+    verify(store, times(1)).insert(inquiry)
   }
 
   it should "send inquiry to sidecar actor" in new Setup {
@@ -79,9 +78,9 @@ class InquiryServiceSpec extends FlatSpec with Matchers with MockitoSugar with A
     private val sidecarActorProbe = TestProbe()
     when(sidecarList.byName(serviceName)).thenReturn(Some(SidecarAndActor(Sidecar(sidecarId, serviceName, SidecarStatus.Registered, ""), sidecarActorProbe.ref)))
     private val inquiry = Inquiry(id, serviceName, startTime, endTime, newInstant, InquiryStatus.Created, sidecarId)
-    when(repo.insert(inquiry)).thenReturn(Future.successful(inquiry))
+    when(store.insert(inquiry)).thenReturn(Future(inquiry))
 
-    await(service.create(request))
+    await(creator.create(request))
 
     sidecarActorProbe.expectMsg(inquiry)
   }

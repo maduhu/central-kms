@@ -5,16 +5,19 @@ import java.util.UUID
 case class KmsError(code: Int, message: String, data: Option[Any] = None)
 
 object KmsError {
+
   def invalidDateRange = KmsError(2000, "Date range must be greater than 0 and less than 30 days")
 
   def healthCheckDoesNotExist = KmsError(121, "Health check does not exist")
 
-
   def parseError = KmsError(-32700, "Parse error")
 
   def invalidRequest = KmsError(-32600, "Invalid Request")
+
   def methodNotFound = KmsError(-32601, "Method not found")
+
   def invalidParams = KmsError(-32602, "Invalid params")
+
   def internalError = KmsError(-32603, "Internal error")
 
   def sidecarExistsError(id: UUID) = KmsError(110, "Sidecar with id '%s' already exists".format(id))
@@ -23,8 +26,12 @@ object KmsError {
 
   def methodNotAllowed(method: String) = KmsError(100, s"'$method' method not allowed in current state")
 
+  def notFound(resource: String, id: UUID) = KmsError(404, s"$resource with id of $id does not exist")
+
   def unregisteredSidecar(id: UUID) = KmsError(1400, "Sidecar '%s' is not registered".format(id))
 
   def unregisteredSidecar(name: String) = KmsError(1401, s"No current sidecars are registered for service '${name}")
+
+  val verificationFailed = KmsError(100, "Verification of signature failed")
 }
 

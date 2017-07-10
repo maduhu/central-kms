@@ -4,18 +4,17 @@ import java.util.UUID
 
 import com.google.inject.Inject
 import org.leveloneproject.central.kms.domain.KmsError
-import org.leveloneproject.central.kms.domain.keys.{CreateKeyRequest, KeyService}
-import org.leveloneproject.central.kms.persistance.{SidecarLogsRepository, SidecarRepository}
+import org.leveloneproject.central.kms.domain.keys.{CreateKeyRequest, KeyCreator}
 import org.leveloneproject.central.kms.util.{ChallengeGenerator, FutureEither, IdGenerator, InstantProvider}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class SidecarService @Inject()(
-                                sidecarRepository: SidecarRepository,
-                                keyService: KeyService,
+                                sidecarStore: SidecarStore,
+                                keyService: KeyCreator,
                                 sidecarList: SidecarList,
-                                sidecarLogsRepository: SidecarLogsRepository
+                                sidecarLogsStore: SidecarLogsStore
                               ) extends ChallengeGenerator with IdGenerator with InstantProvider {
 
   def register(request: RegisterRequest): Future[Either[KmsError, RegisterResponse]] = {
@@ -23,9 +22,9 @@ class SidecarService @Inject()(
     val sidecar = Sidecar(request.id, request.serviceName, status, newChallenge())
 
     for {
-      s ← FutureEither(sidecarRepository.insert(sidecar))
+      s ← FutureEither(sidecarStore.create(sidecar))
       k ← FutureEither(keyService.create(CreateKeyRequest(s.id)))
-      _ ← FutureEither(logStatusChange(sidecar.id, status))
+      _ ← logStatusChange(sidecar.id, status)
     } yield RegisterResponse(s, k)
   }
 
@@ -47,21 +46,24 @@ class SidecarService @Inject()(
   def terminate(sidecar: Sidecar): FutureEither[KmsError, Sidecar] = {
     for {
       updated ← updateStatus(sidecar, SidecarStatus.Terminated)
-      _ ← Future.successful(sidecarList.unregister(sidecar.id))
+      _ ← Future(sidecarList.unregister(sidecar.id))
     } yield Right(updated)
   }
 
-  def active(): Future[Seq[ApiSidecar]] = Future.successful(sidecarList.registered().map(s ⇒ ApiSidecar(s.id, s.serviceName, s.status)))
+  def active(): Future[Seq[ApiSidecar]] = Future(sidecarList.registered().map(s ⇒ ApiSidecar(s.id, s.serviceName, s.status)))
 
   private def updateStatus(sidecar: Sidecar, newStatus: SidecarStatus, message: Option[String] = None): FutureEither[KmsError, Sidecar] = {
     val updated = sidecar.copy(status = newStatus)
     for {
       _ ← logStatusChange(sidecar.id, newStatus, message)
-      _ ← sidecarRepository.updateStatus(sidecar.id, newStatus)
+      _ ← sidecarStore.updateStatus(sidecar.id, newStatus)
     } yield Right(updated)
   }
 
-  private def logStatusChange(sidecarId: UUID, sidecarStatus: SidecarStatus, message: Option[String] = None): Future[Either[KmsError, SidecarLog]] = {
-    sidecarLogsRepository.save(SidecarLog(newId(), sidecarId, now(), sidecarStatus, message))
+  private def logStatusChange(sidecarId: UUID, sidecarStatus: SidecarStatus, message: Option[String] = None): FutureEither[KmsError, SidecarLog] = {
+    sidecarLogsStore.create(SidecarLog(newId(), sidecarId, now(), sidecarStatus, message)).map(Right(_)).recover {
+      case _: Throwable ⇒ Left(KmsError.internalError)
+    }
+
   }
 }

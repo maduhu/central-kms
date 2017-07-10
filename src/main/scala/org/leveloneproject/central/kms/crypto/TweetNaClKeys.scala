@@ -15,12 +15,12 @@ class TweetNaClKeys extends AsymmetricKeyGenerator with AsymmetricVerifier {
     PublicPrivateKeyPair(publicKey.toHex, privateKey.toHex)
   }
 
-  def verify(publicKey: Array[Byte], signature: Array[Byte], message: Array[Byte]): Either[VerificationError, VerificationResult] = {
+  def verify(publicKey: Array[Byte], signature: Array[Byte], message: Array[Byte]): VerificationResult = {
     Try(TweetNaCl.crypto_sign_open(signature, publicKey)) match {
-      case Success(unsigned) if unsigned.deep == message.deep ⇒ Right(VerificationResult.Success)
-      case _ ⇒ Left(VerificationError.InvalidSignature)
+      case Success(unsigned) if unsigned.deep == message.deep ⇒ VerificationResult.Success
+      case _ ⇒ VerificationResult.InvalidSignature
     }
   }
 
-  def verify(publicKey: String, signature: String, message: String): Either[VerificationError, VerificationResult] = verify(publicKey.fromHex, signature.fromHex, message.fromUtf8)
+  def verify(publicKey: String, signature: String, message: String): VerificationResult = verify(publicKey.fromHex, signature.fromHex, message.fromUtf8)
 }

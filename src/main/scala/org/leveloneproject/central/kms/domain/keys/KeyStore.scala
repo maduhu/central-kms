@@ -5,7 +5,7 @@ import java.util.UUID
 import org.leveloneproject.central.kms.domain._
 import scala.concurrent.Future
 
-trait Store {
+trait KeyStore {
 
   def create(key: Key): Future[Either[KmsError, Key]]
 
