@@ -4,6 +4,7 @@ import java.util.UUID
 
 import akka.testkit.TestProbe
 import org.leveloneproject.central.kms.AwaitResult
+import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.BatchCreatorImpl
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckService
 import org.leveloneproject.central.kms.domain.inquiries.InquiryResponseVerifier
@@ -38,7 +39,7 @@ class SidecarActionsSpec extends FlatSpec with Matchers with MockitoSugar with A
   }
 
   it should "return error if verification fails" in new Setup {
-    private val invalidRowSignature = ChallengeError.invalidRowSignature
+    private val invalidRowSignature = KmsError.invalidRowSignature
     when(challengeVerifier.verify(challenge, keys, answer)).thenReturn(Left(invalidRowSignature))
     when(sidecarService.suspend(sidecarAndActor.sidecar, invalidRowSignature.message)).thenReturn(Future(Right(sidecarAndActor.sidecar)))
 

@@ -129,7 +129,7 @@ class SidecarActorSpec extends FlatSpec with AkkaSpec with Matchers with Mockito
   }
 
   it should "send error to socket if challenge fails" in new Setup with ChallengedSidecar {
-    private val challengeError = ChallengeError.invalidRowSignature
+    private val challengeError = KmsError.invalidRowSignature
     when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future(Left(challengeError)))
 
     sidecarActor ! Challenge(commandId, ChallengeAnswer("", ""))

@@ -75,7 +75,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
       wsClient.sendMessage(registerRequest("test", sidecarId, serviceName))
       wsClient.expectMessage(registerResponse("test", sidecarId, privateKey, rowKey, challenge))
       wsClient.sendMessage(registerRequest("test2"))
-      wsClient.expectMessage(s"""{"jsonrpc":"2.0","error":{"code":100,"message":"'register' method not allowed in current state"},"id":"test2"}""")
+      wsClient.expectMessage(s"""{"jsonrpc":"2.0","error":{"code":-32601,"message":"'register' method not allowed in current state"},"id":"test2"}""")
     }
   }
 
@@ -99,7 +99,7 @@ class SocketRouteSpec extends FlatSpec with Matchers with MockitoSugar with Scal
   it should "terminate client on challenge failure" in new Setup {
     private val challengeRequestId = UUID.randomUUID.toString
     setupRegistration()
-    private val invalidRowSignature = ChallengeError.invalidRowSignature
+    private val invalidRowSignature = KmsError.invalidRowSignature
     when(sidecarActions.challenge(any(), any(), any())).thenReturn(Future(Left(invalidRowSignature)))
     val socketRouter = new SocketRouter(webSocketService)
     val wsClient = WSProbe()

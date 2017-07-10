@@ -15,14 +15,14 @@ class ChallengeVerifier @Inject()(asymmetricVerifier: AsymmetricVerifier, symmet
   private def verifyBatchSignature(challenge: String, variables: ChallengeKeys, answer: ChallengeAnswer): Either[KmsError, VerificationResult] = {
     asymmetricVerifier.verify(variables.publicKey, answer.batchSignature, challenge) match {
       case r@VerificationResult(true, _) ⇒ Right(r)
-      case VerificationResult(false, _) ⇒ Left(ChallengeError.invalidBatchSignature)
+      case VerificationResult(false, _) ⇒ Left(KmsError.invalidBatchSignature)
     }
   }
 
   private def verifyRowSignature(challenge: String, variables: ChallengeKeys, answer: ChallengeAnswer): Either[KmsError, VerificationResult] = {
     symmetricVerifier.verify(variables.symmetricKey, answer.rowSignature, challenge) match {
       case r@VerificationResult(true, _) ⇒ Right(r)
-      case VerificationResult(false, _) ⇒ Left(ChallengeError.invalidRowSignature)
+      case VerificationResult(false, _) ⇒ Left(KmsError.invalidRowSignature)
     }
   }
 }
@@ -36,10 +36,4 @@ object ChallengeResult {
 case class ChallengeKeys(publicKey: String, symmetricKey: String)
 
 case class ChallengeAnswer(batchSignature: String, rowSignature: String)
-
-object ChallengeError {
-  val invalidRowSignature = KmsError(1001, "Invalid row signature")
-
-  val invalidBatchSignature = KmsError(1000, "Invalid batch signature")
-}
 
