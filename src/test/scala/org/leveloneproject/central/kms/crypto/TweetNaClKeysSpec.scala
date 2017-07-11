@@ -59,4 +59,17 @@ class TweetNaClKeysSpec extends FlatSpec with Matchers with AwaitResult {
     generator.verify(publicKey, sig, message) shouldBe VerificationResult.Success
   }
 
+  it should "verify up to 64 bytes of the signature" in new Setup {
+
+    val testData = "0ddcdc872c7b748d40efe96c2881ae189d87f56148ed8af3ebbbc80324e38bdd588ddadcbcedf40df0e9697d8bb277c7bb1498fa1d26ce0a835a760b92ca7c85:588ddadcbcedf40df0e9697d8bb277c7bb1498fa1d26ce0a835a760b92ca7c85:65641cd402add8bf3d1d67dbeb6d41debfbef67e4317c35b0a6d5bbbae0e034de7d670ba1413d056f2d6f1de12:c179c09456e235fe24105afa6e8ec04637f8f943817cd098ba95387f9653b2add181a31447d92d1a1ddf1ceb0db62118de9dffb7dcd2424057cbdff5d41d040365641cd402add8bf3d1d67dbeb6d41debfbef67e4317c35b0a6d5bbbae0e034de7d670ba1413d056f2d6f1de12:"
+
+    val splits: Array[String] = testData.split(':')
+    val privateKey: Array[Byte] = splits(0).fromHex
+    val publicKey: Array[Byte] = splits(1).fromHex
+    val message: Array[Byte] = splits(2).fromHex
+    val sig: Array[Byte] = splits(3).fromHex.take(64)
+
+    generator.verify(publicKey, sig, message) shouldBe VerificationResult.Success
+  }
+
 }
