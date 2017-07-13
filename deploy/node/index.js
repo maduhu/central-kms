@@ -21,9 +21,10 @@ const pushService = ({IMAGE, NAME, PORT}, version) => {
       value: Variables.POSTGRES_PASSWORD
     }
   ]
+  const serviceName = `${NAME}-${Variables.ENVIRONMENT}`
   return Ecr.pushImageToEcr(IMAGE, version)
-    .then(result => Ecs.registerTaskDefinition(NAME, result.versioned, PORT, envVariables))
-    .then(taskDefinition => Ecs.deployService(Variables.CLUSTER, NAME, taskDefinition))
+    .then(result => Ecs.registerTaskDefinition(serviceName, result.versioned, PORT, envVariables))
+    .then(taskDefinition => Ecs.deployService(Variables.CLUSTER, serviceName, taskDefinition))
 }
 
 const deploy = () => {

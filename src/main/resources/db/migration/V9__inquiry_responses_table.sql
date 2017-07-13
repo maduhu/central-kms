@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS inquiry_responses (
     CONSTRAINT pk_inquiry_responses_id PRIMARY KEY (id)
 );
 
-CREATE INDEX IF NOT EXISTS ix_inquiry_responses_inquiry_id
+CREATE INDEX ix_inquiry_responses_inquiry_id
     ON inquiry_responses
     USING btree(inquiry_id);
