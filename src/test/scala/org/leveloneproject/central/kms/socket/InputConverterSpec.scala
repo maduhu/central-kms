@@ -111,6 +111,15 @@ class InputConverterSpec extends FlatSpec with Matchers with MessageBuilder {
     private val body = UUID.randomUUID().toString
 
     val message = TextMessage(s"""{"jsonrpc":"2.0","id":"$commandId","method":"inquiry-response","params":{"id":"$batchId","inquiry":"$inquiryId","body":"$body","total":$total,"item":$item}}""")
-    converter.fromMessage(message) shouldBe InquiryReply(commandId, InquiryReplyParameters(batchId, body, inquiryId, total, item))
+    converter.fromMessage(message) shouldBe InquiryReply(commandId, InquiryReplyParameters(Some(batchId), Some(body), inquiryId, total, item))
   }
+
+  it should "convert empty inquiry-response to InquiryReply command" in new Setup {
+    private val commandId = UUID.randomUUID().toString
+    private val inquiryId = UUID.randomUUID()
+
+    val message = TextMessage(s"""{"jsonrpc":"2.0","id":"$commandId","method":"inquiry-response","params":{"inquiry":"$inquiryId","total":0,"item":0}}""")
+    converter.fromMessage(message) shouldBe InquiryReply(commandId, InquiryReplyParameters(None, None, inquiryId, 0, 0))
+  }
+
 }

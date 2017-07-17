@@ -15,8 +15,12 @@ import scala.concurrent.Future
 
 case class InquiryResponseRequest(inquiryId: UUID, batchId: UUID, body: String, total: Int, item: Int, sidecarId: UUID)
 
+case class EmptyInquiryResponse(inquiryId: UUID)
+
 trait InquiryResponseVerifier {
   def verify(response: InquiryResponseRequest): Future[InquiryResponse]
+
+  def verify(response: EmptyInquiryResponse): Future[Unit]
 }
 
 class InquiryResponseVerifierImpl @Inject()(
@@ -27,28 +31,10 @@ class InquiryResponseVerifierImpl @Inject()(
   extends InquiryResponseVerifier with IdGenerator with InstantProvider {
 
   def verify(request: InquiryResponseRequest): Future[InquiryResponse] = {
-
-    def updateInquiryStats(i: Option[Inquiry]): Future[Option[Inquiry]] = {
-      i match {
-        case Some(inquiry) ⇒
-          val newCount = inquiry.responseCount + 1
-          val newTotal = math.max(inquiry.total, request.total)
-          val status = if (newCount == newTotal) InquiryStatus.Complete else InquiryStatus.Pending
-          inquiriesStore.updateStats(inquiry.copy(status = status, total = newTotal, responseCount = newCount))
-        case None ⇒ Future(None)
-      }
-    }
-
-    def findAndUpdateInquiry(id: UUID): FutureEither[KmsError, Inquiry] =
-      for {
-        inquiry ← inquiriesStore.findById(id)
-        updatedInquiry ← updateInquiryStats(inquiry)
-      } yield updatedInquiry.toRight(KmsError.notFound("Inquiry", id))
-
     val response = InquiryResponse(newId(), request.inquiryId, request.batchId, request.body, request.item, now(), request.sidecarId)
 
     val result: Future[Either[KmsError, VerificationResult]] = for {
-      _ ← findAndUpdateInquiry(request.inquiryId)
+      _ ← findAndUpdateInquiry(request.inquiryId, request.total, 1)
       batch ← FutureEither(batchFinder.findById(request.batchId))
       verificationResult ← FutureEither(keyVerifier.verify(batch.sidecarId, batch.signature, request.body))
     } yield verificationResult
@@ -56,6 +42,29 @@ class InquiryResponseVerifierImpl @Inject()(
     result
       .flatMap(e ⇒
         responseStore.create(e.fold(k ⇒ response.copy(verified = false, errorMessage = Some(k.message)), r ⇒ response.copy(verified = r.success, errorMessage = r.message))))
+  }
+
+  def verify(response: EmptyInquiryResponse): Future[Unit] = {
+    val result: Future[Either[KmsError, Inquiry]] = findAndUpdateInquiry(response.inquiryId, 0, 0)
+    result.map(_ ⇒ Nil)
+  }
+
+
+  private def findAndUpdateInquiry(id: UUID, total: Int, addResponses: Int): FutureEither[KmsError, Inquiry] =
+    for {
+      inquiry ← inquiriesStore.findById(id)
+      updatedInquiry ← updateInquiryStats(inquiry, addResponses, total)
+    } yield updatedInquiry.toRight(KmsError.notFound("Inquiry", id))
+
+  private def updateInquiryStats(i: Option[Inquiry], responses: Int, total: Int): Future[Option[Inquiry]] = {
+    i match {
+      case Some(inquiry) ⇒
+        val newCount = inquiry.responseCount + responses
+        val newTotal = math.max(inquiry.total, total)
+        val status = if (newCount == newTotal) InquiryStatus.Complete else InquiryStatus.Pending
+        inquiriesStore.updateStats(inquiry.copy(status = status, total = newTotal, responseCount = newCount))
+      case None ⇒ Future(None)
+    }
   }
 
 }

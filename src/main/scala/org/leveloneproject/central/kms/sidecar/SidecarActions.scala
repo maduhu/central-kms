@@ -6,7 +6,7 @@ import com.google.inject.Inject
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.{Batch, BatchCreatorImpl, CreateBatchRequest}
 import org.leveloneproject.central.kms.domain.healthchecks.{HealthCheck, HealthCheckService}
-import org.leveloneproject.central.kms.domain.inquiries.{InquiryResponseRequest, InquiryResponseVerifier}
+import org.leveloneproject.central.kms.domain.inquiries.{EmptyInquiryResponse, InquiryResponseRequest, InquiryResponseVerifier}
 import org.leveloneproject.central.kms.domain.sidecars._
 
 import scala.concurrent.Future
@@ -36,7 +36,12 @@ class SidecarActions @Inject()(batchService: BatchCreatorImpl,
   }
 
   def inquiryResponse(sidecar: Sidecar, params: InquiryReplyParameters): Future[Unit] = {
-    inquiryResponseVerifier.verify(InquiryResponseRequest(params.inquiry, params.id, params.body, params.total, params.item, sidecar.id)).map(_ ⇒ Nil)
+    params match {
+      case InquiryReplyParameters(Some(batchId), Some(body), inquiryId, total, item) ⇒
+        inquiryResponseVerifier.verify(InquiryResponseRequest(inquiryId, batchId, body, total, item, sidecar.id)).map(_ ⇒ Nil)
+      case InquiryReplyParameters(_, _, inquiryId, _, _) ⇒
+        inquiryResponseVerifier.verify(EmptyInquiryResponse(inquiryId))
+    }
   }
 
   def terminateSidecar(sidecar: Sidecar): Future[Either[KmsError, Sidecar]] = {

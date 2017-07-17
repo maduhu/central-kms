@@ -39,10 +39,11 @@ class InquiryResponseVerifierImplSpec extends FlatSpec with Matchers with Mockit
     val signature = "signature"
     val publicKey = "public key"
     val body = "body"
-    val responseCount = 1
+    val responseCount = 0
     val total = 100
     val item = 50
     val request = InquiryResponseRequest(inquiryId, batchId, body, total, item, keyId)
+    val emptyRequest = EmptyInquiryResponse(inquiryId)
 
     val inquiry = Inquiry(inquiryId, "service", Instant.now(), Instant.now(), Instant.now(), InquiryStatus.Created, keyId, 0, responseCount)
     val batch = Batch(batchId, keyId, signature, Instant.now())
@@ -119,5 +120,11 @@ class InquiryResponseVerifierImplSpec extends FlatSpec with Matchers with Mockit
     private val result = await(verifier.verify(request))
     result shouldBe response.copy(verified = true)
     verify(inquiriesStore, times(1)).updateStats(inquiry.copy(status = InquiryStatus.Complete, total = total, responseCount = total))
+  }
+
+  it should "update inquiry stats and return nothing when inquiry result is empty" in new Setup with GoodInquiry {
+    await(verifier.verify(emptyRequest))
+    verify(inquiriesStore, times(1)).updateStats(inquiry.copy(responseCount = 0, total = 0, status = InquiryStatus.Complete))
+    verify(inquiryResponseStore, times(0)).create(any())
   }
 }

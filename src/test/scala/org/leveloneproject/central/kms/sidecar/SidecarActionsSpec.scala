@@ -1,5 +1,6 @@
 package org.leveloneproject.central.kms.sidecar
 
+import java.time.Instant
 import java.util.UUID
 
 import akka.testkit.TestProbe
@@ -7,10 +8,11 @@ import org.leveloneproject.central.kms.AwaitResult
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.domain.batches.BatchCreatorImpl
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheckService
-import org.leveloneproject.central.kms.domain.inquiries.InquiryResponseVerifier
+import org.leveloneproject.central.kms.domain.inquiries.{EmptyInquiryResponse, InquiryResponse, InquiryResponseRequest, InquiryResponseVerifier}
 import org.leveloneproject.central.kms.domain.sidecars._
 import org.leveloneproject.central.kms.utils.AkkaSpec
 import org.mockito.Mockito._
+import org.mockito.ArgumentMatchers._
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -48,6 +50,29 @@ class SidecarActionsSpec extends FlatSpec with Matchers with MockitoSugar with A
     verify(sidecarService, times(0)).challengeAccepted(sidecarAndActor)
     verify(sidecarService, times(1)).suspend(sidecarAndActor, invalidRowSignature.message)
     verify(challengeVerifier, times(1)).verify(challenge, keys, answer)
+  }
+
+  "inquiry response" should "verify InquiryResponseRequest if parameters contain batchId" in new Setup {
+
+    private val inquiryId = UUID.randomUUID()
+    private val batchId = UUID.randomUUID()
+    val params = InquiryReplyParameters(Some(batchId), Some("body"), inquiryId, 100, 50)
+    private val sidecar1 = sidecar("")
+    private val request = InquiryResponseRequest(inquiryId, batchId, "body", 100, 50, sidecar1.id)
+    private val now = Instant.now()
+    when(inquiryResponseVerifier.verify(request)).thenReturn(Future(InquiryResponse(UUID.randomUUID(), inquiryId, batchId, "body", 50, now, sidecar1.id)))
+    await(actions.inquiryResponse(sidecar1, params))
+
+    verify(inquiryResponseVerifier, times(1)).verify(request)
+  }
+
+  it should "verify EmptyInquiryResponse if parameters does not contain batchId" in new Setup {
+    when(inquiryResponseVerifier.verify(any[EmptyInquiryResponse]())).thenReturn(Future((): Unit))
+    private val inquiryId = UUID.randomUUID()
+    val params = InquiryReplyParameters(None, None, inquiryId, 0, 0)
+    await(actions.inquiryResponse(sidecar(""), params))
+    verify(inquiryResponseVerifier, times(1)).verify(EmptyInquiryResponse(inquiryId))
+
   }
 
   private def sidecar(challenge: String) = {

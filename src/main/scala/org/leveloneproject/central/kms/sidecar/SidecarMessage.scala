@@ -74,4 +74,4 @@ case class Connected(socket: ActorRef) extends SidecarMessage
 case class Disconnect() extends SidecarMessage
 
 case class InquiryReply(id: String, params: InquiryReplyParameters) extends Command("inquiry-response")
-case class InquiryReplyParameters(id: UUID, body: String, inquiry: UUID, total: Int, item: Int)
+case class InquiryReplyParameters(id: Option[UUID], body: Option[String], inquiry: UUID, total: Int, item: Int)
