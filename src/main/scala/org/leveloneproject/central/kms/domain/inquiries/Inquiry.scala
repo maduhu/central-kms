@@ -11,6 +11,5 @@ case class Inquiry(
                     created: Instant,
                     status: InquiryStatus,
                     issuedTo: UUID,
-                    total: Int = 0,
-                    responseCount: Int = 0
+                    total: Int = 0
                   )

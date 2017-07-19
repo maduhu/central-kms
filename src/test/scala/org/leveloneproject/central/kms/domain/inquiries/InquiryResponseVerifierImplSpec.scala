@@ -45,7 +45,7 @@ class InquiryResponseVerifierImplSpec extends FlatSpec with Matchers with Mockit
     val request = InquiryResponseRequest(inquiryId, batchId, body, total, item, keyId)
     val emptyRequest = EmptyInquiryResponse(inquiryId)
 
-    val inquiry = Inquiry(inquiryId, "service", Instant.now(), Instant.now(), Instant.now(), InquiryStatus.Created, keyId, 0, responseCount)
+    val inquiry = Inquiry(inquiryId, "service", Instant.now(), Instant.now(), Instant.now(), InquiryStatus.Created, keyId)
     val batch = Batch(batchId, keyId, signature, Instant.now())
     val key = Key(keyId, publicKey)
     val response = InquiryResponse(inquiryResponseId, inquiryId, batchId, body, item, created, keyId)
@@ -111,20 +111,13 @@ class InquiryResponseVerifierImplSpec extends FlatSpec with Matchers with Mockit
   it should "update inquiry stats" in new Setup with GoodInquiry with GoodBatch with GoodKeyVerification {
     private val result = await(verifier.verify(request))
     result shouldBe response.copy(verified = true)
-    verify(inquiriesStore, times(1)).updateStats(inquiry.copy(responseCount = responseCount + 1, total = total, status = InquiryStatus.Pending))
+    verify(inquiriesStore, times(1)).updateStats(inquiry.copy(total = total, status = InquiryStatus.Pending))
     verifyResponseSaved(result)
   }
 
-  it should "update inquiry status to completed if new count is equal to total" in new Setup with GoodInquiry with GoodBatch with GoodKeyVerification {
-    when(inquiriesStore.findById(inquiryId)).thenReturn(Future(Some(inquiry.copy(responseCount = total - 1))))
-    private val result = await(verifier.verify(request))
-    result shouldBe response.copy(verified = true)
-    verify(inquiriesStore, times(1)).updateStats(inquiry.copy(status = InquiryStatus.Complete, total = total, responseCount = total))
-  }
-
-  it should "update inquiry stats and return nothing when inquiry result is empty" in new Setup with GoodInquiry {
+  it should "update inquiry to complete and return nothing when inquiry result is empty" in new Setup with GoodInquiry {
     await(verifier.verify(emptyRequest))
-    verify(inquiriesStore, times(1)).updateStats(inquiry.copy(responseCount = 0, total = 0, status = InquiryStatus.Complete))
+    verify(inquiriesStore, times(1)).updateStats(inquiry.copy(total = 0, status = InquiryStatus.Complete))
     verify(inquiryResponseStore, times(0)).create(any())
   }
 }

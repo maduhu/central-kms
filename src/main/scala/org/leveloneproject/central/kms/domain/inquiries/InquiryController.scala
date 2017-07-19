@@ -12,7 +12,17 @@ class InquiryController @Inject()(inquiries: InquiriesStore, inquiryResponses: I
   def getInquirySummaryById(id: UUID): Future[Option[InquirySummary]] = {
     inquiries.findById(id).flatMap {
       case None ⇒ Future(None)
-      case Some(i) ⇒ inquiryResponses.findByInquiryId(i.id).map(r ⇒ Some(InquirySummary(i, r)))
+      case Some(i) ⇒ inquiryResponses.findByInquiryId(i.id).flatMap(r ⇒ verifyInquiryStatus(i, r))
+    }
+  }
+
+  private def verifyInquiryStatus(i: Inquiry, r: Seq[InquiryResponse]): Future[Option[InquirySummary]] = {
+    i.status match {
+      case InquiryStatus.Pending if i.total <= r.length ⇒
+        for {
+          inquiry <- inquiries.updateStats(i.copy(status = InquiryStatus.Complete))
+        } yield inquiry.map(i ⇒ InquirySummary(i, r))
+      case _ ⇒ Future(Some(InquirySummary(i, r)))
     }
   }
 }
@@ -27,6 +37,6 @@ case class InquirySummary(status: InquiryStatus, total: Int, completed: Int, res
 
 object InquirySummary {
   def apply(inquiry: Inquiry, responses: Seq[InquiryResponse]): InquirySummary =
-    InquirySummary(inquiry.status, inquiry.total, inquiry.responseCount, responses.map(i ⇒ InquiryResponseSummary(i)))
+    InquirySummary(inquiry.status, inquiry.total, responses.length, responses.map(i ⇒ InquiryResponseSummary(i)))
 }
 

@@ -22,8 +22,8 @@ class PostgresInquiriesStore @Inject()(val dbProvider: DbProvider) extends Postg
   def updateStats(inquiry: Inquiry): Future[Option[Inquiry]] =
     db.run(inquiries
       .filter(_.id === inquiry.id)
-      .map(i ⇒ (i.status, i.total, i.responseCount))
-      .update(inquiry.status, inquiry.total, inquiry.responseCount)
+      .map(i ⇒ (i.status, i.total))
+      .update(inquiry.status, inquiry.total)
       .map {
         case 0 ⇒ None
         case _ ⇒ Some(inquiry)

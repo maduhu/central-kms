@@ -34,20 +34,18 @@ class InquiryControllerSpec extends FlatSpec with Matchers with MockitoSugar wit
 
   it should "return summary with empty responses if no responses found" in new Setup {
     private val total = 100
-    private val responseCount = 50
     private val status = InquiryStatus.Pending
-    private val inquiry = Inquiry(inquiryId, "service", now, now, now, status, UUID.randomUUID, total, responseCount)
+    private val inquiry = Inquiry(inquiryId, "service", now, now, now, status, UUID.randomUUID, total)
     when(inquiries.findById(inquiryId)).thenReturn(Future(Some(inquiry)))
     when(responses.findByInquiryId(inquiryId)).thenReturn(Future(Seq()))
 
-    await(controller.getInquirySummaryById(inquiryId)) shouldBe Some(InquirySummary(status, total, responseCount, Seq.empty))
+    await(controller.getInquirySummaryById(inquiryId)) shouldBe Some(InquirySummary(status, total, 0, Seq.empty))
   }
 
   it should "return summary with responses" in new Setup {
     private val total = 100
-    private val responseCount = 50
     private val status = InquiryStatus.Pending
-    private val inquiry = Inquiry(inquiryId, "service", now, now, now, status, UUID.randomUUID, total, responseCount)
+    private val inquiry = Inquiry(inquiryId, "service", now, now, now, status, UUID.randomUUID, total)
     when(inquiries.findById(inquiryId)).thenReturn(Future(Some(inquiry)))
     private val response1Id = UUID.randomUUID()
     private val response2Id = UUID.randomUUID()
@@ -55,6 +53,25 @@ class InquiryControllerSpec extends FlatSpec with Matchers with MockitoSugar wit
     when(responses.findByInquiryId(inquiryId)).thenReturn(Future(r))
 
     private val expectedSummaries = Seq(InquiryResponseSummary(response1Id, "body", verified = true), InquiryResponseSummary(response2Id, "body", verified = false))
-    await(controller.getInquirySummaryById(inquiryId)) shouldBe Some(InquirySummary(status, total, responseCount, expectedSummaries))
+    await(controller.getInquirySummaryById(inquiryId)) shouldBe Some(InquirySummary(status, total, r.length, expectedSummaries))
+    verify(inquiries, times(0)).updateStats(any[Inquiry]())
+  }
+
+  it should "update status to complete if status is pending and response count matches total" in new Setup {
+    private val total = 2
+    private val pending = InquiryStatus.Pending
+    private val inquiry = Inquiry(inquiryId, "service", now, now, now, pending, UUID.randomUUID(), total)
+    private val completeInquiry = inquiry.copy(status = InquiryStatus.Complete)
+    when(inquiries.findById(inquiryId)).thenReturn(Future(Some(inquiry)))
+    when(inquiries.updateStats(completeInquiry)).thenReturn(Future(Some(completeInquiry)))
+    private val r = Seq(inquiryResponse(), inquiryResponse())
+    when(responses.findByInquiryId(inquiryId)).thenReturn(Future(r))
+    var result = await(controller.getInquirySummaryById(inquiryId)).get
+    result.status shouldBe InquiryStatus.Complete
+    result.completed shouldBe r.length
+    result.total shouldBe total
+    result.results.length shouldBe r.length
+
+    verify(inquiries, times(1)).updateStats(completeInquiry)
   }
 }

@@ -34,7 +34,7 @@ class InquiryResponseVerifierImpl @Inject()(
     val response = InquiryResponse(newId(), request.inquiryId, request.batchId, request.body, request.item, now(), request.sidecarId)
 
     val result: Future[Either[KmsError, VerificationResult]] = for {
-      _ ← findAndUpdateInquiry(request.inquiryId, request.total, 1)
+      _ ← findAndUpdateInquiry(request.inquiryId, request.total, InquiryStatus.Pending)
       batch ← FutureEither(batchFinder.findById(request.batchId))
       verificationResult ← FutureEither(keyVerifier.verify(batch.sidecarId, batch.signature, request.body))
     } yield verificationResult
@@ -45,24 +45,23 @@ class InquiryResponseVerifierImpl @Inject()(
   }
 
   def verify(response: EmptyInquiryResponse): Future[Unit] = {
-    val result: Future[Either[KmsError, Inquiry]] = findAndUpdateInquiry(response.inquiryId, 0, 0)
+    val result: Future[Either[KmsError, Inquiry]] = findAndUpdateInquiry(response.inquiryId, 0, InquiryStatus.Complete)
     result.map(_ ⇒ Nil)
   }
 
 
-  private def findAndUpdateInquiry(id: UUID, total: Int, addResponses: Int): FutureEither[KmsError, Inquiry] =
+  private def findAndUpdateInquiry(id: UUID, total: Int, newStatus: InquiryStatus): FutureEither[KmsError, Inquiry] =
     for {
       inquiry ← inquiriesStore.findById(id)
-      updatedInquiry ← updateInquiryStats(inquiry, addResponses, total)
+      updatedInquiry ← updateInquiryStats(inquiry, total, newStatus)
     } yield updatedInquiry.toRight(KmsError.notFound("Inquiry", id))
 
-  private def updateInquiryStats(i: Option[Inquiry], responses: Int, total: Int): Future[Option[Inquiry]] = {
+  private def updateInquiryStats(i: Option[Inquiry], total: Int, newStatus: InquiryStatus): Future[Option[Inquiry]] = {
     i match {
       case Some(inquiry) ⇒
-        val newCount = inquiry.responseCount + responses
         val newTotal = math.max(inquiry.total, total)
-        val status = if (newCount == newTotal) InquiryStatus.Complete else InquiryStatus.Pending
-        inquiriesStore.updateStats(inquiry.copy(status = status, total = newTotal, responseCount = newCount))
+        val status = newStatus
+        inquiriesStore.updateStats(inquiry.copy(status = status, total = newTotal))
       case None ⇒ Future(None)
     }
   }

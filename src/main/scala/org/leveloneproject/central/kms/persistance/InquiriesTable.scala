@@ -28,9 +28,7 @@ trait InquiriesTable extends DataMappers {
 
     def total: Rep[Int] = column[Int]("total")
 
-    def responseCount: Rep[Int] = column[Int]("response_count")
-
-    def * : ProvenShape[Inquiry] = (id, service, startTime, endTime, created, status, issuedTo, total, responseCount) <> (Inquiry.tupled, Inquiry.unapply)
+    def * : ProvenShape[Inquiry] = (id, service, startTime, endTime, created, status, issuedTo, total) <> (Inquiry.tupled, Inquiry.unapply)
   }
 
   val inquiries: TableQuery[InquiresTable] = TableQuery[InquiresTable]
