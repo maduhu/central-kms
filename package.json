@@ -1,6 +1,6 @@
 {
   "name": "central-kms",
-  "version": "0.7.8",
+  "version": "0.7.9",
   "private": true,
   "description": "Central Key Management Store",
   "scripts": {
