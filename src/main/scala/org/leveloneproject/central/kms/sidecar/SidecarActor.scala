@@ -2,7 +2,7 @@ package org.leveloneproject.central.kms.sidecar
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorRef, PoisonPill, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Props}
 import org.leveloneproject.central.kms.domain.healthchecks.HealthCheck
 import org.leveloneproject.central.kms.domain.inquiries.Inquiry
 import org.leveloneproject.central.kms.domain.sidecars._
@@ -11,7 +11,7 @@ import org.leveloneproject.central.kms.util.JsonSerializer
 
 import scala.language.implicitConversions
 
-class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerializer {
+class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerializer with ActorLogging {
 
   import Responses._
   import context._
@@ -20,6 +20,7 @@ class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerial
 
   def connected(out: ActorRef): Receive = {
     case Register(id, registerParameters) ⇒
+      log.info("Registering sidecar {}", id)
       sidecarActions.registerSidecar(registerParameters) map {
         case Right(response) ⇒
           become(challenged(SidecarAndOutSocket(response.sidecar, out), ChallengeKeys(response.keyResponse.publicKey, response.keyResponse.symmetricKey)))
@@ -48,10 +49,16 @@ class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerial
     case CompleteRequest(jsonResponse) ⇒ handleRequest(jsonResponse)
     case SaveBatch(id, params) ⇒
       sidecarActions.createBatch(sidecarAndOutSocket, params).map {
-        _.fold(e ⇒ commandError(id, e), batch ⇒ batchCreated(id, batch))
+        _.fold(e ⇒ commandError(id, e), batch ⇒ {
+          log.info("Batch {} created", batch.id)
+          batchCreated(id, batch)
+        })
       }.map { result ⇒ sidecarAndOutSocket.out ! result }
 
-    case InquiryReply(_, params) ⇒ sidecarActions.inquiryResponse(sidecarAndOutSocket, params)
+    case InquiryReply(_, params) ⇒
+      log.info("Handling inquiry reply for inquiry={}, item={}", params.inquiry, params.item)
+      sidecarActions.inquiryResponse(sidecarAndOutSocket, params)
+
     case healthCheck: HealthCheck ⇒ request(sidecarAndOutSocket, healthCheckRequest(healthCheck), completeHealthCheck)
     case inquiry: Inquiry ⇒ sidecarAndOutSocket.out ! inquiryCommand(inquiry)
     case command: Command ⇒ sidecarAndOutSocket.out ! methodNotAllowed(command)
