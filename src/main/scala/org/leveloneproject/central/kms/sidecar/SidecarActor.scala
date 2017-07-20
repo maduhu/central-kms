@@ -20,7 +20,7 @@ class SidecarActor(sidecarActions: SidecarActions) extends Actor with JsonSerial
 
   def connected(out: ActorRef): Receive = {
     case Register(id, registerParameters) ⇒
-      log.info("Registering sidecar {}", id)
+      log.info("Registering sidecar {}", registerParameters.id)
       sidecarActions.registerSidecar(registerParameters) map {
         case Right(response) ⇒
           become(challenged(SidecarAndOutSocket(response.sidecar, out), ChallengeKeys(response.keyResponse.publicKey, response.keyResponse.symmetricKey)))
