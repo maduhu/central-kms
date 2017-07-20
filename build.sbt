@@ -22,6 +22,8 @@ libraryDependencies ++= Seq(
   "net.codingwell"      % "scala-guice_2.12"      % "4.1.0",
   "org.flywaydb"        % "flyway-core"           % "4.1.2",
   "org.postgresql"      % "postgresql"            % "42.0.0",
+  "ch.qos.logback"      %  "logback-classic"      % "1.1.3",
+  "com.typesafe.akka"   %% "akka-slf4j"           % akkaVersion,
   "com.zaxxer"          % "HikariCP"              % "2.6.1",
   "org.scalatest"       %% "scalatest"            % "3.0.3" % Test,
   "com.typesafe.akka"   %% "akka-http-testkit"    % akkaHttpVersion % Test,

@@ -4,12 +4,17 @@ import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import org.leveloneproject.central.kms.domain.KmsError
 import org.leveloneproject.central.kms.sidecar.SidecarMessageParser
 import org.leveloneproject.central.kms.util.JsonDeserializer
+import org.slf4j.LoggerFactory
 
 trait InputConverter extends SidecarMessageParser with JsonDeserializer {
 
+  private val log = LoggerFactory.getLogger(classOf[InputConverter])
   private def toJsonMessage(text: String): Either[KmsError, JsonMessage] = {
     if (text.isEmpty) Left(KmsError.parseError)
-    else deserializeSafe[JsonMessage](text)
+    else {
+      log.info("Received message={}", text)
+      deserializeSafe[JsonMessage](text)
+    }
   }
 
   def fromMessage(message: Message): AnyRef = {
