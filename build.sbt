@@ -16,7 +16,6 @@ libraryDependencies ++= Seq(
   "org.bouncycastle"    % "bcprov-jdk15on"        % "1.57",
   "com.typesafe.slick"  %% "slick"                % slickVersion,
   "com.typesafe.slick"  %% "slick-hikaricp"       % slickVersion exclude("com.zaxxer.HikariCP", "HikariCP"),
-  "org.slf4j"           % "slf4j-nop"             % "1.6.4",
   "com.google.inject"   % "guice"                 % "4.1.0",
   "com.tzavellas"       %  "sse-guice"            % "0.7.1" exclude("com.google.inject", "guice"),
   "net.codingwell"      % "scala-guice_2.12"      % "4.1.0",
